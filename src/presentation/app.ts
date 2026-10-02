@@ -9,109 +9,486 @@ import { Navigation } from '../platform/navigation.js';
 import type { Screen } from '../platform/navigation.js';
 import { renderCreature } from './creature.js';
 import { escape, title } from './html.js';
+import { availableAbilities, canUse, currentActor } from '../domain/combat.js';
+import type { Battle, Combatant } from '../domain/combat.js';
+import { deriveCreature } from '../domain/generator.js';
+import type { BattleReward } from '../application/workshop.js';
 export function downloadSave(raw: string): void {
-  const url=URL.createObjectURL(new Blob([raw],{type:'application/json'})),link=document.createElement('a');
-  link.href=url;link.download='monster-workshop-save.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),0);
+  const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' })),
+    link = document.createElement('a');
+  link.href = url;
+  link.download = 'monster-workshop-save.json';
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
-const sequenceSteps=['Inserting components','Scanning biological signatures','Assembling the genome','Checking for mutations','Opening the chamber'];
-const statNames={hp:'Health',attack:'Attack',defense:'Armor',speed:'Speed',power:'Power',energy:'Energy'};
+const sequenceSteps = [
+  'Inserting components',
+  'Scanning biological signatures',
+  'Assembling the genome',
+  'Checking for mutations',
+  'Opening the chamber',
+];
+const statNames = {
+  hp: 'Health',
+  attack: 'Attack',
+  defense: 'Armor',
+  speed: 'Speed',
+  power: 'Power',
+  energy: 'Energy',
+};
 export class GameUI {
   private nav: Navigation;
   private selected = new Set<string>();
   private inspectedId: string | undefined;
-  private filter='all';
-  private notice='';
-  private isError=false;
-  private sequence: {id:string;step:number} | undefined;
+  private filter = 'all';
+  private notice = '';
+  private isError = false;
+  private sequence: { id: string; step: number } | undefined;
   private revealId: string | undefined;
   private timer: ReturnType<typeof setTimeout> | undefined;
-  private feedback=new Feedback();
-  constructor(private root: HTMLElement, private workshop: Workshop, private content: ContentIndex) {
-    for(const part of content.components.values())if(part.slot==='head'||part.slot==='body')this.selected.add(part.id);
-    this.nav=new Navigation(()=>{this.render();this.root.querySelector<HTMLElement>('h1')?.focus();});
-    root.addEventListener('click',event=>{
-      const button=(event.target as HTMLElement).closest<HTMLElement>('[data-action]');
-      if(button)void this.act(button.dataset.action!,button).catch(error=>this.fail(error));
+  private feedback = new Feedback();
+  private squad = new Set<string>();
+  private squadInitialized = false;
+  private selectedAbility = 'strike';
+  private selectedTarget: string | undefined;
+  private lastActor: string | undefined;
+  private reward: BattleReward | undefined;
+  constructor(
+    private root: HTMLElement,
+    private workshop: Workshop,
+    private content: ContentIndex,
+  ) {
+    for (const part of content.components.values())
+      if (part.slot === 'head' || part.slot === 'body') this.selected.add(part.id);
+    this.nav = new Navigation(() => {
+      this.render();
+      this.root.querySelector<HTMLElement>('h1')?.focus();
     });
-    root.addEventListener('submit',event=>{
-      const form=event.target as HTMLFormElement;
-      if(form.dataset.rename){event.preventDefault();try{this.workshop.rename(form.dataset.rename,new FormData(form).get('name') as string);this.notice='Name saved.';this.render();}catch(error){this.fail(error);}}
+    root.addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLElement>('[data-action]');
+      if (button) void this.act(button.dataset.action!, button).catch((error) => this.fail(error));
     });
-    root.addEventListener('change',event=>void this.change(event.target as HTMLInputElement).catch(error=>this.fail(error)));
+    root.addEventListener('submit', (event) => {
+      const form = event.target as HTMLFormElement;
+      if (form.dataset.rename) {
+        event.preventDefault();
+        try {
+          this.workshop.rename(form.dataset.rename, new FormData(form).get('name') as string);
+          this.notice = 'Name saved.';
+          this.render();
+        } catch (error) {
+          this.fail(error);
+        }
+      }
+    });
+    root.addEventListener(
+      'change',
+      (event) =>
+        void this.change(event.target as HTMLInputElement).catch((error) => this.fail(error)),
+    );
     this.render();
   }
-  private animated(): boolean { return !this.workshop.state.options.reducedMotion&&!matchMedia('(prefers-reduced-motion: reduce)').matches; }
-  private fail(error: unknown): void { logger.error(error);this.notice=error instanceof Error?error.message:'Something went wrong';this.isError=true;this.render(); }
+  private animated(): boolean {
+    return (
+      !this.workshop.state.options.reducedMotion &&
+      !matchMedia('(prefers-reduced-motion: reduce)').matches
+    );
+  }
+  private fail(error: unknown): void {
+    logger.error(error);
+    this.notice = error instanceof Error ? error.message : 'Something went wrong';
+    this.isError = true;
+    this.render();
+  }
   private applyOptions(state: PlayerState): void {
-    document.documentElement.style.fontSize=`${16*state.options.textScale}px`;
-    document.body.classList.toggle('reduced-motion',state.options.reducedMotion);
-    this.feedback.enabled=state.options.sound;this.feedback.haptics=state.options.haptics;
+    document.documentElement.style.fontSize = `${16 * state.options.textScale}px`;
+    document.body.classList.toggle('reduced-motion', state.options.reducedMotion);
+    this.feedback.enabled = state.options.sound;
+    this.feedback.haptics = state.options.haptics;
   }
   private render(focusPart?: string): void {
-    const state=this.workshop.state;this.applyOptions(state);
-    const screen=this.nav.current;
-    const body=screen==='creatures'?this.creaturesView(state):screen==='journal'?this.journalView(state):screen==='settings'?this.settingsView(state):this.workshopView(state);
-    const tabs: [Screen,string,string][]=[['workshop','Workshop','⚗'],['creatures','Creatures','◈'],['journal','Journal','≡'],['settings','Settings','⚙']];
-    this.root.innerHTML=`<header class="topbar"><a class="brand" href="#workshop"><img src="./icon.svg" alt="" width="36" height="36"><span>MONSTER<span class="brand-light">WORKSHOP</span></span></a><div class="resource"><span class="resource-dot" aria-hidden="true"></span><strong>${state.biomass}</strong><span>biomass</span></div></header><nav class="navigation" aria-label="Main navigation">${tabs.map(([key,label,symbol])=>`<a href="#${key}" ${screen===key?'aria-current="page"':''}><span aria-hidden="true">${symbol}</span>${label}${key==='creatures'?`<small>${state.creatures.length}</small>`:''}</a>`).join('')}</nav><main class="shell game-shell">${this.notice?`<div class="notice ${this.isError?'error':''}" role="${this.isError?'alert':'status'}">${escape(this.notice)}<button class="quiet" data-action="dismiss" aria-label="Dismiss message">×</button></div>`:''}${body}</main><footer class="footer">A little science. A little strange. <span>Saved on this device</span></footer>${this.modal()}`;
-    const dialog=this.root.querySelector<HTMLDialogElement>('dialog');
-    if(dialog){dialog.showModal();dialog.addEventListener('cancel',event=>{event.preventDefault();this.closeReveal();});}
-    if(focusPart)Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-part]')).find(b=>b.dataset.part===focusPart)?.focus();
+    const state = this.workshop.state;
+    this.applyOptions(state);
+    const screen = this.nav.current;
+    const body =
+      screen === 'creatures'
+        ? this.creaturesView(state)
+        : screen === 'battle'
+          ? this.battleView(state)
+          : screen === 'journal'
+            ? this.journalView(state)
+            : screen === 'settings'
+              ? this.settingsView(state)
+              : this.workshopView(state);
+    const tabs: [Screen, string, string][] = [
+      ['workshop', 'Workshop', '⚗'],
+      ['creatures', 'Creatures', '◈'],
+      ['battle', 'Battle', '⚔'],
+      ['journal', 'Journal', '≡'],
+      ['settings', 'Settings', '⚙'],
+    ];
+    this.root.innerHTML = `<header class="topbar"><a class="brand" href="#workshop"><img src="./icon.svg" alt="" width="36" height="36"><span>MONSTER<span class="brand-light">WORKSHOP</span></span></a><div class="resource"><span class="resource-dot" aria-hidden="true"></span><strong>${state.biomass}</strong><span>biomass</span></div></header><nav class="navigation" aria-label="Main navigation">${tabs.map(([key, label, symbol]) => `<a href="#${key}" ${screen === key ? 'aria-current="page"' : ''}><span aria-hidden="true">${symbol}</span>${label}${key === 'creatures' ? `<small>${state.creatures.length}</small>` : ''}</a>`).join('')}</nav><main class="shell game-shell">${this.notice ? `<div class="notice ${this.isError ? 'error' : ''}" role="${this.isError ? 'alert' : 'status'}">${escape(this.notice)}<button class="quiet" data-action="dismiss" aria-label="Dismiss message">×</button></div>` : ''}${body}</main><footer class="footer">A little science. A little strange. <span>Saved on this device</span></footer>${this.modal()}`;
+    const dialog = this.root.querySelector<HTMLDialogElement>('dialog');
+    if (dialog) {
+      dialog.showModal();
+      dialog.addEventListener('cancel', (event) => {
+        event.preventDefault();
+        this.closeReveal();
+      });
+    }
+    if (focusPart)
+      Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-part]'))
+        .find((b) => b.dataset.part === focusPart)
+        ?.focus();
   }
   private preview(): Creature | undefined {
-    try{return generateCreature([...this.selected],this.content,{seed:0,createdAt:'2026-10-02T00:00:00Z',creator:'Preview',skipMutations:true});}catch{return undefined;}
+    try {
+      return generateCreature([...this.selected], this.content, {
+        seed: 0,
+        createdAt: '2026-10-02T00:00:00Z',
+        creator: 'Preview',
+        skipMutations: true,
+      });
+    } catch {
+      return undefined;
+    }
   }
   private stats(creature: Creature): string {
-    return `<dl class="stats">${STAT_KEYS.map(k=>`<div><dt>${statNames[k]}</dt><dd>${creature.stats[k]}</dd></div>`).join('')}</dl>`;
+    return `<dl class="stats">${STAT_KEYS.map((k) => `<div><dt>${statNames[k]}</dt><dd>${creature.stats[k]}</dd></div>`).join('')}</dl>`;
   }
   private workshopView(state: PlayerState): string {
-    const creature=this.preview(),cost=creature?this.workshop.cost([...this.selected]):0;
-    const enough=creature&&cost<=state.biomass&&[...this.selected].every(id=>(state.inventory[id]??0)>0)&&state.creatures.length<this.content.catalog.rules.workshop.maxCreatures;
-    const guidance=state.creatures.length===0?'Start with a head and body. Add an organ, then bring your idea to life.':state.creatures.length<3?`Your habitat has ${state.creatures.length} creature${state.creatures.length===1?'':'s'}. Try a different combination next.`:'Your habitat is growing. Compare your experiments in the journal.';
-    return `<div class="page-heading"><div><p class="eyebrow">WORKSHOP 01 / APPRENTICE ENGINEER</p><h1 tabindex="-1">What will you create?</h1><p class="muted">Impossible anatomy. Unexpected possibilities.</p></div><span class="tag mint">● SYSTEMS ONLINE</span></div><div class="guide"><span class="guide-icon" aria-hidden="true">✦</span><div><strong>Your next experiment</strong><p>${guidance}</p></div></div><div class="preview-grid"><section class="panel stage"><div class="stage-label"><span class="tag">CREATION CHAMBER</span><span class="tag">${String(state.nextSerial).padStart(3,'0')} / PROTOTYPE</span></div><div class="preview-art">${creature?renderCreature(creature,this.content,this.animated()):'<div class="empty-chamber"><span aria-hidden="true">⚗</span><p>Select a head and body</p></div>'}</div><h2>${creature?escape(creature.name):'An idea takes shape'}</h2><p>${creature?`${title(creature.element)} · predicted ${creature.quality}`:'Every creature starts with a question.'}</p>${creature?this.stats(creature):''}<p class="micro">Live anatomy preview · final genes vary at manufacture</p></section><section class="panel bench"><div class="section-title"><h2>Anatomy bench</h2><span class="tag">${this.selected.size} PARTS</span></div><p class="muted">Tap a component to add or remove it.</p><div class="part-grid">${this.content.catalog.components.map(p=>{
-      const discovered=state.discoveredComponents.includes(p.id),selected=this.selected.has(p.id),quantity=state.inventory[p.id]??0;
-      return `<button class="part ${selected?'selected':''} ${!discovered?'locked':''}" data-action="part" data-part="${p.id}" aria-pressed="${selected}" ${!discovered||(!selected&&quantity===0)?'disabled':''}><span class="part-icon" aria-hidden="true">${discovered?({head:'♜',body:'◆',legs:'╳',organ:'ϟ',armor:'⬡',wings:'⋈'}[p.slot]):'?'}</span><span class="part-copy"><strong>${discovered?escape(p.name):'Unknown component'}</strong><small>${title(p.slot)} · ${discovered?title(p.element):'Win a battle to discover'}</small></span><span class="quantity">${discovered?'×'+quantity:'LOCKED'}</span></button>`;
-    }).join('')}</div><div class="forecast"><div><span>Compatibility</span><strong>${creature?creature.compatibility.score+'%':'—'}</strong></div><div class="meter"><span style="width:${creature?.compatibility.score??0}%"></span></div><div><span>${creature?.compatibility.tier??'Incomplete anatomy'}</span><span class="mutation-hint">Mutation potential ${creature?Math.round(creature.compatibility.mutationChance*100)+'%':'—'}</span></div></div>${creature?.compatibility.reasons.length?`<details class="interactions"><summary>Genetic interactions · ${creature.compatibility.reasons.length}</summary><ul>${creature.compatibility.reasons.map(r=>`<li>${escape(r)}</li>`).join('')}</ul></details>`:''}<button class="primary manufacture" data-action="manufacture" ${!enough?'disabled':''}><span>✦ Manufacture creature</span><span>${cost} biomass</span></button>${!enough?'<p class="micro">Choose a head and body with available parts and biomass.</p>':'<p class="micro">Consumes one of each selected part. No two genomes are quite alike.</p>'}</section></div>`;
+    const creature = this.preview(),
+      cost = creature ? this.workshop.cost([...this.selected]) : 0;
+    const enough =
+      creature &&
+      cost <= state.biomass &&
+      [...this.selected].every((id) => (state.inventory[id] ?? 0) > 0) &&
+      state.creatures.length < this.content.catalog.rules.workshop.maxCreatures;
+    const blockedReason = !creature
+      ? 'Choose a head and body to complete the anatomy.'
+      : state.creatures.length >= this.content.catalog.rules.workshop.maxCreatures
+        ? `Your habitat is full (${this.content.catalog.rules.workshop.maxCreatures} specimens). Export your discoveries in Settings.`
+        : cost > state.biomass
+          ? 'Not enough biomass. Win a simulator battle to replenish it.'
+          : 'A selected part is out of stock. Win a simulator battle to replenish it.';
+    const guidance =
+      state.creatures.length === 0
+        ? 'Start with a head and body. Add an organ, then bring your idea to life.'
+        : state.creatures.length < 3
+          ? `Your habitat has ${state.creatures.length} creature${state.creatures.length === 1 ? '' : 's'}. Build a squad of three to enter the simulator.`
+          : state.discoveredComponents.length > 5
+            ? 'New biology recovered. Try adding your discovery to a fresh design.'
+            : 'Your squad is ready. <a href="#battle">Test your inventions in a 3v3 battle →</a>';
+    return `<div class="page-heading"><div><p class="eyebrow">WORKSHOP 01 / APPRENTICE ENGINEER</p><h1 tabindex="-1">What will you create?</h1><p class="muted">Impossible anatomy. Unexpected possibilities.</p></div><span class="tag mint">● SYSTEMS ONLINE</span></div><div class="guide"><span class="guide-icon" aria-hidden="true">✦</span><div><strong>Your next experiment</strong><p>${guidance}</p></div></div><div class="preview-grid"><section class="panel stage"><div class="stage-label"><span class="tag">CREATION CHAMBER</span><span class="tag">${String(state.nextSerial).padStart(3, '0')} / PROTOTYPE</span></div><div class="preview-art">${creature ? renderCreature(creature, this.content, this.animated()) : '<div class="empty-chamber"><span aria-hidden="true">⚗</span><p>Select a head and body</p></div>'}</div><h2>${creature ? escape(creature.name) : 'An idea takes shape'}</h2><p>${creature ? `${title(creature.element)} · predicted ${creature.quality}` : 'Every creature starts with a question.'}</p>${creature ? this.stats(creature) : ''}<p class="micro">Live anatomy preview · final genes vary at manufacture</p></section><section class="panel bench"><div class="section-title"><h2>Anatomy bench</h2><span class="tag">${this.selected.size} PARTS</span></div><p class="muted">Tap a component to add or remove it.</p><div class="part-grid">${this.content.catalog.components
+      .map((p) => {
+        const discovered = state.discoveredComponents.includes(p.id),
+          selected = this.selected.has(p.id),
+          quantity = state.inventory[p.id] ?? 0;
+        return `<button class="part ${selected ? 'selected' : ''} ${!discovered ? 'locked' : ''}" data-action="part" data-part="${p.id}" aria-pressed="${selected}" ${!discovered || (!selected && quantity === 0) ? 'disabled' : ''}><span class="part-icon" aria-hidden="true">${discovered ? { head: '♜', body: '◆', legs: '╳', organ: 'ϟ', armor: '⬡', wings: '⋈' }[p.slot] : '?'}</span><span class="part-copy"><strong>${discovered ? escape(p.name) : 'Unknown component'}</strong><small>${title(p.slot)} · ${discovered ? title(p.element) : 'Win a battle to discover'}</small></span><span class="quantity">${discovered ? '×' + quantity : 'LOCKED'}</span></button>`;
+      })
+      .join(
+        '',
+      )}</div><div class="forecast"><div><span>Compatibility</span><strong>${creature ? creature.compatibility.score + '%' : '—'}</strong></div><div class="meter"><span style="width:${creature?.compatibility.score ?? 0}%"></span></div><div><span>${creature?.compatibility.tier ?? 'Incomplete anatomy'}</span><span class="mutation-hint">Mutation potential ${creature ? Math.round(creature.compatibility.mutationChance * 100) + '%' : '—'}</span></div></div>${creature?.compatibility.reasons.length ? `<details class="interactions"><summary>Genetic interactions · ${creature.compatibility.reasons.length}</summary><ul>${creature.compatibility.reasons.map((r) => `<li>${escape(r)}</li>`).join('')}</ul></details>` : ''}<button class="primary manufacture" data-action="manufacture" ${!enough ? 'disabled' : ''}><span>✦ Manufacture creature</span><span>${cost} biomass</span></button>${!enough ? `<p class="micro">${escape(blockedReason)}</p>` : '<p class="micro">Consumes one of each selected part. No two genomes are quite alike.</p>'}</section></div>`;
   }
   private creaturesView(state: PlayerState): string {
-    const all=this.workshop.creatures,creatures=all.filter(c=>this.filter!=='mutated'||c.mutationIds.length>0);
-    const selected=all.find(c=>c.id===this.inspectedId);
-    return `<div class="page-heading"><div><p class="eyebrow">YOUR LIVING INVENTIONS</p><h1 tabindex="-1">The habitat</h1><p class="muted">${state.creatures.length} / ${this.content.catalog.rules.workshop.maxCreatures} specimens · Made by you.</p></div><label class="filter-label">Show <select data-filter="true" aria-label="Filter creatures"><option value="all" ${this.filter==='all'?'selected':''}>All creatures</option><option value="mutated" ${this.filter==='mutated'?'selected':''}>Mutated creatures</option></select></label></div>${!all.length?'<section class="panel empty"><h2>Your first invention belongs here.</h2><p class="muted">Build something curious in the creation chamber.</p><a class="primary" href="#workshop">Start an experiment</a></section>':`<div class="creature-grid">${creatures.map(c=>`<button class="panel creature-card" data-action="inspect" data-id="${escape(c.id)}">${renderCreature(c,this.content,false)}<strong>${escape(c.name)}</strong><span class="card-meta">${title(c.element)} · ${title(c.quality)} · Lv ${c.level}</span><span class="tag ${c.mutationIds.length?'gold':''}">${c.mutationIds.length?'✦ MUTATED':c.roles.map(title).join(' / ')}</span></button>`).join('')}</div>${!creatures.length?'<p class="muted">No mutations discovered yet. Try an electric component.</p>':''}`}${selected?`<section class="panel specimen-detail" id="specimen-detail"><div class="section-title"><h2>${escape(selected.name)}</h2><span class="tag">SPECIMEN ${escape(selected.id)}</span></div>${this.stats(selected)}<form data-rename="${escape(selected.id)}" class="rename-form"><label>Name your creation<input name="name" maxlength="40" required value="${escape(selected.name)}"></label><button class="secondary" type="submit">Save name</button></form><div class="detail-grid"><div><h3>Genome</h3>${GENES.map(id=>`<div class="gene-row"><span>${title(id)}</span><meter min="0" max="100" value="${selected.genome[id].value}" aria-label="${id}"></meter><strong>${selected.genome[id].value}</strong></div>`).join('')}</div><div><h3>Abilities</h3>${selected.abilityIds.map(id=>{const a=this.content.ability(id);return `<div class="ability-detail"><strong>${escape(a.name)}</strong><p>${escape(a.description)}</p></div>`;}).join('')}</div><div><h3>Origin & traits</h3><p class="muted">Created by ${escape(selected.creator)}<br>${escape(new Date(selected.createdAt).toLocaleDateString())}<br>Seed ${selected.seed} · ${selected.history.victories} victories</p>${selected.componentIds.map(id=>`<span class="tag">${escape(this.content.component(id).name)}</span>`).join('')}<p>${selected.traitIds.map(id=>escape(this.content.traits.get(id)!.name)).join(' · ')}</p>${selected.mutationIds.map(id=>`<p class="gold-text">✦ ${escape(this.content.mutations.get(id)!.name)}</p>`).join('')}</div></div></section>`:''}`;
+    const all = this.workshop.creatures,
+      creatures = all.filter((c) => this.filter !== 'mutated' || c.mutationIds.length > 0);
+    const selected = all.find((c) => c.id === this.inspectedId);
+    return `<div class="page-heading"><div><p class="eyebrow">YOUR LIVING INVENTIONS</p><h1 tabindex="-1">The habitat</h1><p class="muted">${state.creatures.length} / ${this.content.catalog.rules.workshop.maxCreatures} specimens · Made by you.</p></div><label class="filter-label">Show <select data-filter="true" aria-label="Filter creatures"><option value="all" ${this.filter === 'all' ? 'selected' : ''}>All creatures</option><option value="mutated" ${this.filter === 'mutated' ? 'selected' : ''}>Mutated creatures</option></select></label></div>${!all.length ? '<section class="panel empty"><h2>Your first invention belongs here.</h2><p class="muted">Build something curious in the creation chamber.</p><a class="primary" href="#workshop">Start an experiment</a></section>' : `<div class="creature-grid">${creatures.map((c) => `<button class="panel creature-card" data-action="inspect" data-id="${escape(c.id)}">${renderCreature(c, this.content, false)}<strong>${escape(c.name)}</strong><span class="card-meta">${title(c.element)} · ${title(c.quality)} · Lv ${c.level}</span><span class="tag ${c.mutationIds.length ? 'gold' : ''}">${c.mutationIds.length ? '✦ MUTATED' : c.roles.map(title).join(' / ')}</span></button>`).join('')}</div>${!creatures.length ? '<p class="muted">No mutations discovered yet. Try an electric component.</p>' : ''}`}${
+      selected
+        ? `<section class="panel specimen-detail" id="specimen-detail"><div class="section-title"><h2>${escape(selected.name)}</h2><span class="tag">SPECIMEN ${escape(selected.id)}</span></div>${this.stats(selected)}<form data-rename="${escape(selected.id)}" class="rename-form"><label>Name your creation<input name="name" maxlength="40" required value="${escape(selected.name)}"></label><button class="secondary" type="submit">Save name</button></form><div class="detail-grid"><div><h3>Genome</h3>${GENES.map((id) => `<div class="gene-row"><span>${title(id)}</span><meter min="0" max="100" value="${selected.genome[id].value}" aria-label="${id}"></meter><strong>${selected.genome[id].value}</strong></div>`).join('')}</div><div><h3>Abilities</h3>${selected.abilityIds
+            .map((id) => {
+              const a = this.content.ability(id);
+              return `<div class="ability-detail"><strong>${escape(a.name)}</strong><p>${escape(a.description)}</p></div>`;
+            })
+            .join(
+              '',
+            )}</div><div><h3>Origin & traits</h3><p class="muted">Created by ${escape(selected.creator)}<br>${escape(new Date(selected.createdAt).toLocaleDateString())}<br>Seed ${selected.seed} · ${selected.history.victories} victories</p>${selected.componentIds.map((id) => `<span class="tag">${escape(this.content.component(id).name)}</span>`).join('')}<p>${selected.traitIds.map((id) => escape(this.content.traits.get(id)!.name)).join(' · ')}</p>${selected.mutationIds.map((id) => `<p class="gold-text">✦ ${escape(this.content.mutations.get(id)!.name)}</p>`).join('')}</div></div></section>`
+        : ''
+    }`;
   }
   private journalView(state: PlayerState): string {
-    return `<div class="page-heading"><div><p class="eyebrow">SCIENCE BEGINS WITH A QUESTION</p><h1 tabindex="-1">Experiment journal</h1><p class="muted">Every combination tells you something.</p></div><span class="tag">${state.experiments.length} EXPERIMENTS</span></div><div class="journal-layout"><section class="panel"><h2>Discovery codex</h2><p class="muted">${state.discoveredComponents.length} / ${this.content.components.size} components</p><div class="codex-list">${this.content.catalog.components.map(p=>`<div><span>${state.discoveredComponents.includes(p.id)?escape(p.name):'???'}</span><span class="tag">${state.discoveredComponents.includes(p.id)?title(p.rarity):'UNDISCOVERED'}</span></div>`).join('')}</div><h3>Mutations</h3>${this.content.catalog.mutations.map(m=>`<div class="discovery"><strong>${state.discoveredMutations.includes(m.id)?escape(m.name):'??? / Unknown mutation'}</strong><p class="muted">${state.discoveredMutations.includes(m.id)?escape(m.description):'Experiment with unstable or energetic biology.'}</p></div>`).join('')}</section><section class="experiment-list">${state.experiments.length?[...state.experiments].reverse().map(e=>`<article class="panel experiment"><p class="eyebrow">EXPERIMENT #${String(e.serial).padStart(3,'0')}</p><h2>${escape(state.creatures.find(c=>c.id===e.creatureId)!.name)}</h2><p class="recipe">${e.componentIds.map(id=>escape(this.content.component(id).name)).join(' + ')}</p><div class="section-title"><span class="tag">${e.compatibility}% COMPATIBLE</span><span class="tag ${e.mutationIds.length?'gold':''}">${e.mutationIds.length?e.mutationIds.map(id=>escape(this.content.mutations.get(id)!.name)).join(', '):'STABLE MANUFACTURE'}</span></div><p class="micro">Seed ${e.seed} · ${escape(new Date(e.createdAt).toLocaleString())}</p></article>`).join(''):'<section class="panel empty"><h2>A blank page. Infinite possibilities.</h2><p class="muted">Your first manufacture will be recorded here.</p></section>'}</section></div>`;
+    return `<div class="page-heading"><div><p class="eyebrow">SCIENCE BEGINS WITH A QUESTION</p><h1 tabindex="-1">Experiment journal</h1><p class="muted">Every combination tells you something.</p></div><span class="tag">${state.experiments.length} EXPERIMENTS</span></div><div class="journal-layout"><section class="panel"><h2>Discovery codex</h2><p class="muted">${state.discoveredComponents.length} / ${this.content.components.size} components</p><div class="codex-list">${this.content.catalog.components.map((p) => `<div><span>${state.discoveredComponents.includes(p.id) ? escape(p.name) : '???'}</span><span class="tag">${state.discoveredComponents.includes(p.id) ? title(p.rarity) : 'UNDISCOVERED'}</span></div>`).join('')}</div><h3>Mutations</h3>${this.content.catalog.mutations.map((m) => `<div class="discovery"><strong>${state.discoveredMutations.includes(m.id) ? escape(m.name) : '??? / Unknown mutation'}</strong><p class="muted">${state.discoveredMutations.includes(m.id) ? escape(m.description) : 'Experiment with unstable or energetic biology.'}</p></div>`).join('')}</section><section class="experiment-list">${
+      state.experiments.length
+        ? [...state.experiments]
+            .reverse()
+            .map(
+              (e) =>
+                `<article class="panel experiment"><p class="eyebrow">EXPERIMENT #${String(e.serial).padStart(3, '0')}</p><h2>${escape(state.creatures.find((c) => c.id === e.creatureId)!.name)}</h2><p class="recipe">${e.componentIds.map((id) => escape(this.content.component(id).name)).join(' + ')}</p><div class="section-title"><span class="tag">${e.compatibility}% COMPATIBLE</span><span class="tag ${e.mutationIds.length ? 'gold' : ''}">${e.mutationIds.length ? e.mutationIds.map((id) => escape(this.content.mutations.get(id)!.name)).join(', ') : 'STABLE MANUFACTURE'}</span></div><p class="micro">Seed ${e.seed} · ${escape(new Date(e.createdAt).toLocaleString())}</p></article>`,
+            )
+            .join('')
+        : '<section class="panel empty"><h2>A blank page. Infinite possibilities.</h2><p class="muted">Your first manufacture will be recorded here.</p></section>'
+    }</section></div>`;
   }
   private settingsView(state: PlayerState): string {
-    return `<div class="page-heading"><div><p class="eyebrow">MAKE YOURSELF AT HOME</p><h1 tabindex="-1">Workshop settings</h1></div></div><div class="settings-grid"><section class="panel"><h2>Comfort & feedback</h2>${(['sound','haptics','reducedMotion'] as const).map(k=>`<label class="option"><span>${{sound:'Sound effects',haptics:'Haptic feedback',reducedMotion:'Reduce animation'}[k]}</span><input type="checkbox" data-option="${k}" ${state.options[k]?'checked':''}></label>`).join('')}<label class="option"><span>Text size</span><select data-option="textScale" aria-label="Text size">${[1,1.15,1.3].map(v=>`<option value="${v}" ${state.options.textScale===v?'selected':''}>${Math.round(v*100)}%</option>`).join('')}</select></label></section><section class="panel"><h2>Keep your discoveries</h2><p class="muted">Your workshop lives in this browser. Export a copy to keep it safe or move it to another device.</p><div class="save-actions"><button class="secondary" data-action="export">Export save</button><label class="secondary file-button">Import save<input type="file" accept=".json,application/json" data-import="true" aria-label="Import save"></label><button class="quiet" data-action="backup">Restore previous save</button></div><p class="micro">Imports replace this workshop after validation. A backup of the previous save is retained. Diagnostics stay on this device.</p></section></div>`;
+    return `<div class="page-heading"><div><p class="eyebrow">MAKE YOURSELF AT HOME</p><h1 tabindex="-1">Workshop settings</h1></div></div><div class="settings-grid"><section class="panel"><h2>Comfort & feedback</h2>${(['sound', 'haptics', 'reducedMotion'] as const).map((k) => `<label class="option"><span>${{ sound: 'Sound effects', haptics: 'Haptic feedback', reducedMotion: 'Reduce animation' }[k]}</span><input type="checkbox" data-option="${k}" ${state.options[k] ? 'checked' : ''}></label>`).join('')}<label class="option"><span>Text size</span><select data-option="textScale" aria-label="Text size">${[1, 1.15, 1.3].map((v) => `<option value="${v}" ${state.options.textScale === v ? 'selected' : ''}>${Math.round(v * 100)}%</option>`).join('')}</select></label></section><section class="panel"><h2>Keep your discoveries</h2><p class="muted">Your workshop lives in this browser. Export a copy to keep it safe or move it to another device.</p><div class="save-actions"><button class="secondary" data-action="export">Export save</button><label class="secondary file-button">Import save<input type="file" accept=".json,application/json" data-import="true" aria-label="Import save"></label><button class="quiet" data-action="backup">Restore previous save</button></div><p class="micro">Imports replace this workshop after validation. A backup of the previous save is retained. Diagnostics stay on this device.</p></section></div>`;
+  }
+  private validTargets(battle: Battle, actor: Combatant): Combatant[] {
+    const ability = this.content.ability(this.selectedAbility);
+    return battle.units.filter(
+      (u) =>
+        u.hp > 0 &&
+        (ability.target === 'self'
+          ? u.id === actor.id
+          : ability.target === 'ally'
+            ? u.team === actor.team
+            : u.team !== actor.team),
+    );
+  }
+  private battleView(state: PlayerState): string {
+    const heading =
+      '<div class="page-heading"><div><p class="eyebrow">BUILD IT. TEST IT. IMPROVE IT.</p><h1 tabindex="-1">Combat simulator</h1><p class="muted">Three inventions. A thousand possibilities.</p></div><span class="tag">3 VS 3 / FIELD TEST</span></div>';
+    if (this.reward) {
+      const discovery = this.reward.newComponent
+        ? this.content.component(this.reward.newComponent)
+        : undefined;
+      return `${heading}<section class="panel reward-panel"><p class="eyebrow">${this.reward.victory ? 'FIELD TEST PASSED' : 'TEST COMPLETE'}</p><h2>${discovery ? 'New biology. New possibilities.' : this.reward.victory ? 'Your inventions proved themselves.' : 'A new idea is already taking shape.'}</h2>${discovery ? `<div class="reward-symbol" aria-hidden="true">⋈</div><h3>${escape(discovery.name)}</h3><p class="muted">${escape(discovery.lore)}</p>` : '<p class="muted">Every specimen has returned safely to the habitat.</p>'}<div class="reward-items"><span class="tag mint">+${this.reward.biomass} BIOMASS</span>${Object.entries(
+        this.reward.quantities,
+      )
+        .map(
+          ([id, n]) => `<span class="tag">+${n} ${escape(this.content.component(id).name)}</span>`,
+        )
+        .join(
+          '',
+        )}</div><div class="dialog-actions"><button class="primary" data-action="use-discovery">${discovery ? 'Try your new component' : 'Build another creature'}</button><button class="secondary" data-action="new-test">Run another test</button></div><p class="micro">Rewards saved. Creature history updated.</p></section>`;
+    }
+    const battle = state.activeBattle;
+    if (!battle) {
+      const creatures = this.workshop.creatures;
+      if (!this.squadInitialized && creatures.length >= 3) {
+        this.squad = new Set(creatures.slice(0, 3).map((c) => c.id));
+        this.squadInitialized = true;
+      }
+      for (const id of this.squad) if (!creatures.some((c) => c.id === id)) this.squad.delete(id);
+      return `${heading}<section class="panel"><div class="section-title"><h2>Choose your field team</h2><span class="tag">${this.squad.size} / 3 SELECTED</span></div><p class="muted">${creatures.length < 3 ? 'Manufacture three creatures to begin. Every team member must be your own invention.' : 'Mix armor, speed and elemental power. Tap a specimen to change the squad.'}</p>${creatures.length ? `<div class="creature-grid squad-grid">${creatures.map((c) => `<button class="panel creature-card ${this.squad.has(c.id) ? 'squad-selected' : ''}" data-action="squad" data-id="${escape(c.id)}" aria-pressed="${this.squad.has(c.id)}">${renderCreature(c, this.content, false)}<strong>${escape(c.name)}</strong><span class="card-meta">${title(c.element)} · ${c.stats.hp} HP · ${c.stats.speed} speed</span><span class="tag">${this.squad.has(c.id) ? '✓ SELECTED' : 'ADD TO SQUAD'}</span></button>`).join('')}</div>` : '<div class="empty"><p>Your first team is waiting to be built.</p><a class="primary" href="#workshop">Return to the workshop</a></div>'}<div class="battle-start"><p class="micro">Victory earns biomass, components and a new discovery. Defeated creatures recover. No entry cost.</p><button class="primary" data-action="start-battle" ${this.squad.size !== 3 ? 'disabled' : ''}>Start field test</button></div></section>`;
+    }
+    const actor = currentActor(battle);
+    if (actor && actor.id !== this.lastActor) {
+      this.lastActor = actor.id;
+      this.selectedAbility = 'strike';
+      this.selectedTarget = undefined;
+    }
+    const targets = actor ? this.validTargets(battle, actor) : [];
+    if (!targets.some((u) => u.id === this.selectedTarget)) this.selectedTarget = targets[0]?.id;
+    const card = (u: Combatant): string => {
+      const creature = deriveCreature(u.source, this.content),
+        valid = targets.some((t) => t.id === u.id);
+      return `<button class="fight-card ${u.id === actor?.id ? 'current' : ''} ${u.id === this.selectedTarget ? 'target' : ''} ${u.hp === 0 ? 'defeated' : ''}" data-action="target" data-target="${escape(u.id)}" aria-label="Target ${escape(u.source.name)}, ${u.hp} of ${u.stats.hp} health" aria-pressed="${u.id === this.selectedTarget}" ${!valid ? 'disabled' : ''}>${renderCreature(creature, this.content, false)}<strong>${escape(u.source.name)}</strong><span class="hp-label">${u.hp} / ${u.stats.hp} HP${u.shield ? ` · ${u.shield} shield` : ''}</span><span class="health-meter"><span style="width:${(u.hp / u.stats.hp) * 100}%"></span></span><span class="unit-statuses">${u.statuses.map((s) => `<span class="tag">${title(s.id)} ${s.duration}</span>`).join('')}${u.hp === 0 ? '<span class="tag">RECOVERING</span>' : ''}</span></button>`;
+    };
+    const terminal = battle.status !== 'active';
+    return `${heading}<div class="battle-grid"><section class="panel battlefield"><div class="section-title"><h2>${terminal ? (battle.status === 'victory' ? 'Victory!' : 'Test complete') : `Round ${battle.round}`}</h2><span class="tag">${terminal ? 'ALL SPECIMENS RETAINED' : `TURN ${battle.turnIndex + 1} / ${battle.order.length}`}</span></div><p class="team-label">SIMULATOR PROTOTYPES</p><div class="fight-team enemies">${battle.units
+      .filter((u) => u.team === 'enemy')
+      .map(card)
+      .join(
+        '',
+      )}</div><div class="arena-divider"><span>VS</span></div><div class="fight-team allies">${battle.units
+      .filter((u) => u.team === 'player')
+      .map(card)
+      .join('')}</div><p class="team-label">YOUR INVENTIONS</p>${
+      !terminal
+        ? `<p class="micro">Turn order · ${battle.order
+            .slice(battle.turnIndex)
+            .map((id) => escape(battle.units.find((u) => u.id === id)!.source.name))
+            .join(' → ')}</p>`
+        : ''
+    }</section><section class="combat-sidebar">${
+      actor
+        ? `<section class="panel combat-controls"><p class="eyebrow">YOUR TURN</p><h2>${escape(actor.source.name)}</h2><p class="muted">${actor.energy} / ${actor.stats.energy} energy · Choose an ability, then a target.</p><div class="ability-grid">${availableAbilities(
+            actor,
+            this.content,
+          )
+            .map(
+              (a) =>
+                `<button class="ability-button ${a.id === this.selectedAbility ? 'selected' : ''}" data-action="ability" data-ability="${a.id}" aria-pressed="${a.id === this.selectedAbility}" title="${escape(a.description)}" ${!canUse(actor, a) ? 'disabled' : ''}><strong>${escape(a.name)}</strong><small>${a.cost} energy · ${(actor.cooldowns[a.id] ?? 0) > 0 ? `${actor.cooldowns[a.id]} turns left` : a.target === 'enemy' ? 'Enemy' : title(a.target)}</small></button>`,
+            )
+            .join(
+              '',
+            )}</div><p class="ability-description">${escape(this.content.ability(this.selectedAbility).description)}</p><button class="primary execute-action" data-action="battle-action" ${!this.selectedTarget ? 'disabled' : ''}>Use ${escape(this.content.ability(this.selectedAbility).name)}</button><p class="micro">Target: ${escape(targets.find((u) => u.id === this.selectedTarget)?.source.name ?? 'Choose a target')}</p><button class="quiet retreat" data-action="retreat">Retreat safely</button></section>`
+        : `<section class="panel battle-result"><p class="eyebrow">${battle.status === 'victory' ? 'CREATURE ENGINEERING: SUCCESS' : 'A CHANCE TO IMPROVE'}</p><h2>${battle.status === 'victory' ? 'Your designs work.' : 'Every experiment teaches you something.'}</h2><p class="muted">${battle.status === 'victory' ? 'Collect your materials and a new component discovery.' : 'Your creatures recover for another attempt. Try more armor or elemental power.'}</p><button class="primary" data-action="claim-battle">${battle.status === 'victory' ? 'Collect rewards' : 'Return to habitat'}</button></section>`
+    }<details class="panel battle-log" open><summary>Battle log</summary><ol role="log" aria-live="polite">${battle.log
+      .slice(-8)
+      .map((line) => `<li>${escape(line)}</li>`)
+      .join('')}</ol></details></section></div>`;
   }
   private modal(): string {
-    const id=this.sequence?.id??this.revealId;if(!id)return '';
-    const creature=this.workshop.creatures.find(c=>c.id===id)!;
-    if(this.sequence)return `<dialog class="creation-dialog" aria-labelledby="sequence-title"><p class="eyebrow">MANUFACTURING IN PROGRESS</p><h2 id="sequence-title">${sequenceSteps[this.sequence.step]}</h2><div class="scan-orb" aria-hidden="true">ϟ</div><div class="sequence-dots" aria-hidden="true">${sequenceSteps.map((_,i)=>`<span class="${i<=this.sequence!.step?'active':''}"></span>`).join('')}</div><p class="muted">Something impossible is waking up.</p><button class="secondary" data-action="skip">Skip sequence</button></dialog>`;
-    return `<dialog class="creation-dialog reveal" aria-labelledby="reveal-title"><p class="eyebrow">${creature.mutationIds.length?'✦ UNEXPECTED MUTATION':'MANUFACTURE COMPLETE'}</p><h2 id="reveal-title">${escape(creature.name)}</h2>${renderCreature(creature,this.content,this.animated())}<span class="tag">${title(creature.quality)} · ${title(creature.element)}</span>${creature.mutationIds.map(id=>`<div class="discovery"><strong>${escape(this.content.mutations.get(id)!.name)}</strong><p>${escape(this.content.mutations.get(id)!.description)}</p></div>`).join('')}<p class="muted">You made this. Now see what it can do.</p><div class="dialog-actions"><button class="primary" data-action="view-created">Meet your creature</button><button class="quiet" data-action="close">Keep experimenting</button></div></dialog>`;
+    const id = this.sequence?.id ?? this.revealId;
+    if (!id) return '';
+    const creature = this.workshop.creatures.find((c) => c.id === id)!;
+    if (this.sequence)
+      return `<dialog class="creation-dialog" aria-labelledby="sequence-title"><p class="eyebrow">MANUFACTURING IN PROGRESS</p><h2 id="sequence-title">${sequenceSteps[this.sequence.step]}</h2><div class="scan-orb" aria-hidden="true">ϟ</div><div class="sequence-dots" aria-hidden="true">${sequenceSteps.map((_, i) => `<span class="${i <= this.sequence!.step ? 'active' : ''}"></span>`).join('')}</div><p class="muted">Something impossible is waking up.</p><button class="secondary" data-action="skip">Skip sequence</button></dialog>`;
+    return `<dialog class="creation-dialog reveal" aria-labelledby="reveal-title"><p class="eyebrow">${creature.mutationIds.length ? '✦ UNEXPECTED MUTATION' : 'MANUFACTURE COMPLETE'}</p><h2 id="reveal-title">${escape(creature.name)}</h2>${renderCreature(creature, this.content, this.animated())}<span class="tag">${title(creature.quality)} · ${title(creature.element)}</span>${creature.mutationIds.map((id) => `<div class="discovery"><strong>${escape(this.content.mutations.get(id)!.name)}</strong><p>${escape(this.content.mutations.get(id)!.description)}</p></div>`).join('')}<p class="muted">You made this. Now see what it can do.</p><div class="dialog-actions"><button class="primary" data-action="view-created">Meet your creature</button><button class="quiet" data-action="close">Keep experimenting</button></div></dialog>`;
   }
-  private closeReveal(): void {if(this.timer)clearTimeout(this.timer);this.sequence=undefined;this.revealId=undefined;this.render();this.root.querySelector<HTMLButtonElement>('[data-action="manufacture"]')?.focus();}
-  private finishSequence(): void {if(this.timer)clearTimeout(this.timer);this.revealId=this.sequence?.id??this.revealId;this.sequence=undefined;this.render();}
+  private closeReveal(): void {
+    if (this.timer) clearTimeout(this.timer);
+    this.sequence = undefined;
+    this.revealId = undefined;
+    this.render();
+    this.root.querySelector<HTMLButtonElement>('[data-action="manufacture"]')?.focus();
+  }
+  private finishSequence(): void {
+    if (this.timer) clearTimeout(this.timer);
+    this.revealId = this.sequence?.id ?? this.revealId;
+    this.sequence = undefined;
+    this.render();
+  }
   private advanceSequence(): void {
-    this.timer=setTimeout(()=>{if(!this.sequence)return;if(this.sequence.step>=sequenceSteps.length-1)this.finishSequence();else{this.sequence.step++;this.render();this.advanceSequence();}},450);
+    this.timer = setTimeout(() => {
+      if (!this.sequence) return;
+      if (this.sequence.step >= sequenceSteps.length - 1) this.finishSequence();
+      else {
+        this.sequence.step++;
+        this.render();
+        this.advanceSequence();
+      }
+    }, 450);
   }
   private async act(action: string, button: HTMLElement): Promise<void> {
-    this.isError=false;
-    if(action==='part') {const id=button.dataset.part!;if(this.selected.has(id))this.selected.delete(id);else this.selected.add(id);this.feedback.play('select');this.notice='';this.render(id);}
-    if(action==='manufacture'&&!this.sequence&&!this.revealId) {
-      const creature=this.workshop.manufacture([...this.selected],new Date().toISOString());this.inspectedId=creature.id;this.feedback.play('create');this.notice='';
-      if(this.animated()){this.sequence={id:creature.id,step:0};this.render();this.advanceSequence();}else{this.revealId=creature.id;this.render();}
+    this.isError = false;
+    if (action === 'part') {
+      const id = button.dataset.part!;
+      if (this.selected.has(id)) this.selected.delete(id);
+      else this.selected.add(id);
+      this.feedback.play('select');
+      this.notice = '';
+      this.render(id);
     }
-    if(action==='skip')this.finishSequence();
-    if(action==='close')this.closeReveal();
-    if(action==='view-created'){this.closeReveal();this.nav.go('creatures');}
-    if(action==='inspect'){this.inspectedId=button.dataset.id;this.render();this.root.querySelector('#specimen-detail')?.scrollIntoView({behavior:this.animated()?'smooth':'instant',block:'start'});}
-    if(action==='export')downloadSave(this.workshop.exportSave());
-    if(action==='backup'){this.workshop.restoreBackup();this.notice='Previous save restored.';this.render();}
-    if(action==='dismiss'){this.notice='';this.render();}
+    if (action === 'manufacture' && !this.sequence && !this.revealId) {
+      const creature = this.workshop.manufacture([...this.selected], new Date().toISOString());
+      this.inspectedId = creature.id;
+      this.feedback.play('create');
+      this.notice = '';
+      if (this.animated()) {
+        this.sequence = { id: creature.id, step: 0 };
+        this.render();
+        this.advanceSequence();
+      } else {
+        this.revealId = creature.id;
+        this.render();
+      }
+    }
+    if (action === 'skip') this.finishSequence();
+    if (action === 'close') this.closeReveal();
+    if (action === 'view-created') {
+      this.closeReveal();
+      this.nav.go('creatures');
+    }
+    if (action === 'inspect') {
+      this.inspectedId = button.dataset.id;
+      this.render();
+      this.root
+        .querySelector('#specimen-detail')
+        ?.scrollIntoView({ behavior: this.animated() ? 'smooth' : 'instant', block: 'start' });
+    }
+    if (action === 'export') downloadSave(this.workshop.exportSave());
+    if (action === 'backup') {
+      this.workshop.restoreBackup();
+      this.reward = undefined;
+      this.lastActor = undefined;
+      this.notice = 'Previous save restored.';
+      this.render();
+    }
+    if (action === 'dismiss') {
+      this.notice = '';
+      this.render();
+    }
+    if (action === 'squad') {
+      const id = button.dataset.id!;
+      if (this.squad.has(id)) this.squad.delete(id);
+      else if (this.squad.size < 3) this.squad.add(id);
+      else {
+        this.notice = 'Remove one team member before adding another.';
+      }
+      this.render();
+    }
+    if (action === 'start-battle') {
+      this.workshop.startBattle([...this.squad], new Date().toISOString());
+      this.lastActor = undefined;
+      this.selectedTarget = undefined;
+      this.notice = '';
+      this.render();
+    }
+    if (action === 'ability') {
+      this.selectedAbility = button.dataset.ability!;
+      this.selectedTarget = undefined;
+      this.render();
+    }
+    if (action === 'target') {
+      this.selectedTarget = button.dataset.target;
+      this.render();
+    }
+    if (action === 'battle-action') {
+      const battle = this.workshop.state.activeBattle,
+        actor = battle ? currentActor(battle) : undefined;
+      if (!actor || !this.selectedTarget) throw new Error('Choose an action and target');
+      this.workshop.battleAction({
+        actorId: actor.id,
+        abilityId: this.selectedAbility,
+        targetId: this.selectedTarget,
+      });
+      this.feedback.play('select');
+      this.render();
+    }
+    if (action === 'retreat') {
+      this.workshop.retreatBattle();
+      this.render();
+    }
+    if (action === 'claim-battle') {
+      this.reward = this.workshop.claimBattle();
+      if (this.reward.victory) this.feedback.play('victory');
+      this.render();
+    }
+    if (action === 'use-discovery') {
+      this.reward = undefined;
+      const state = this.workshop.state;
+      this.selected = new Set(
+        this.content.catalog.components
+          .filter(
+            (p) =>
+              (state.inventory[p.id] ?? 0) > 0 &&
+              (this.content.catalog.rules.generation.requiredSlots.includes(p.slot) ||
+                p.id === this.content.catalog.rules.combat.rewardComponent),
+          )
+          .map((p) => p.id),
+      );
+      this.nav.go('workshop');
+    }
+    if (action === 'new-test') {
+      this.reward = undefined;
+      this.render();
+    }
   }
   private async change(input: HTMLInputElement): Promise<void> {
-    if(input.dataset.filter){this.filter=input.value;this.render();}
-    if(input.dataset.option){const options=this.workshop.state.options,key=input.dataset.option;if(key==='textScale')options.textScale=Number(input.value);else if(key==='sound'||key==='haptics'||key==='reducedMotion')options[key]=input.checked;this.workshop.updateOptions(options);this.render();this.feedback.play('select');}
-    if(input.dataset.import){const file=input.files?.[0];if(!file)return;if(file.size>1_000_000)throw new Error('Save file is too large');this.workshop.importSave(await file.text());this.selected=new Set(this.content.catalog.rules.generation.requiredSlots.map(slot=>this.content.catalog.components.find(p=>p.slot===slot)!.id));this.inspectedId=undefined;this.notice='Workshop imported.';this.isError=false;this.render();}
+    if (input.dataset.filter) {
+      this.filter = input.value;
+      this.render();
+    }
+    if (input.dataset.option) {
+      const options = this.workshop.state.options,
+        key = input.dataset.option;
+      if (key === 'textScale') options.textScale = Number(input.value);
+      else if (key === 'sound' || key === 'haptics' || key === 'reducedMotion')
+        options[key] = input.checked;
+      this.workshop.updateOptions(options);
+      this.render();
+      this.feedback.play('select');
+    }
+    if (input.dataset.import) {
+      const file = input.files?.[0];
+      if (!file) return;
+      if (file.size > 1_000_000) throw new Error('Save file is too large');
+      this.workshop.importSave(await file.text());
+      this.selected = new Set(
+        this.content.catalog.rules.generation.requiredSlots.map(
+          (slot) => this.content.catalog.components.find((p) => p.slot === slot)!.id,
+        ),
+      );
+      this.inspectedId = undefined;
+      this.reward = undefined;
+      this.squadInitialized = false;
+      this.squad.clear();
+      this.notice = 'Workshop imported.';
+      this.isError = false;
+      this.render();
+    }
   }
 }

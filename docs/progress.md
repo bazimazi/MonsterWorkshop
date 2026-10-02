@@ -30,4 +30,10 @@ Implemented transactional inventory/currency spending, distinct specimen identit
 
 Validation: 23 unit tests and 10 desktop/mobile browser scenarios pass. Tests cover exact spending, deterministic provenance, exhausted/locked inventory, imports, rename/settings, failed-write rollback, full creation/rename/reload/journal flow, invalid anatomy, accessibility options and corrupted-save recovery. Workshop screenshots were visually inspected at both sizes. Touch targets and icon-plus-text labels stay readable, including the larger-text setting.
 
-Phase 5 is pending. Phases 6–12 are explicitly deferred under the specification's first-slice gate.
+## Phase 5 — Basic combat and closed discovery loop
+
+Implemented pure 3v3 turn resolution, data-defined actions/AI, armor/resistance/critical damage, shields/healing, burn/poison/shock/slow/weakness/regeneration, energy and exact cooldown timing. Battles persist at each player action and resume deterministically. Victory/defeat/retreat retain creatures. Reward claims are transactional and unique, grant experience/history, restock materials and discover Storm Wings. Players can immediately manufacture a winged specimen. A revisioned service worker enables offline reload and play. CLI tools inspect content, generate/validate creatures, edit genes, force/test mutations, simulate combat/economy and profile generation/visuals.
+
+Validation: 40 unit tests plus 16 desktop/mobile browser scenarios pass, including the full three-creature manufacture → combat → reload → reward → new component → fourth manufacture loop, shield targeting, offline manufacture and actual exported-file reimport. The property sweep covers 1,920 creations; mutation testing covers 4,000 rolls; combat tests cover 100 seeded deterministic battles and developer simulations cover another 1,000 battles. Economy simulations cover six profiles at 1/7/30/90 days. Screenshots were inspected. [Milestone review](review.md) records the findings and limits; [playtest guide](playtest.md) makes the result reviewable.
+
+Phases 0–5 are complete and separately committed. Phases 6–12 are explicitly deferred under specification sections 117/120 until core-loop playtesting; no later-phase placeholder systems were shipped.

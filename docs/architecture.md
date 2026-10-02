@@ -4,7 +4,7 @@
 
 The repository initially contained README, license and a Node-oriented ignore file. No existing game systems or engine project were present. This implementation follows specification sections 117 and 120: **only the first vertical slice**, spanning phases 0–5. Phase 5 includes repeatable battle rewards and a sixth discoverable component to close the creation loop. Phases 6–12 remain separate work, gated by playtesting. Breeding specifically needs evidence that creation is fun.
 
-TypeScript, native browser ES modules, semantic HTML/CSS, SVG anatomy, Web Audio and localStorage form a mobile-first single-player game. Node 24 supplies build orchestration, a static development server and unit tests. TypeScript and Node types are development-only dependencies, justified by strict domain checking; Playwright will provide browser verification. There are no runtime libraries. A browser slice allows immediate Android/iOS browser play without requiring native engine tooling; native store packages, 3D rigs and online authority are outside this deliverable. The manifest supports a standalone launch where supported. Offline application caching will be delivered with the completed slice.
+TypeScript, native browser ES modules, semantic HTML/CSS, SVG anatomy, Web Audio and localStorage form a mobile-first single-player game. Node 24 supplies build orchestration, a static development server and unit tests. TypeScript and Node types are development-only dependencies, justified by strict domain checking; Playwright provides browser verification and Prettier provides consistent formatting. There are no runtime libraries. A browser slice allows immediate Android/iOS browser play without requiring native engine tooling; native store packages, 3D rigs and online authority are outside this deliverable. The manifest supports a standalone launch where supported. A build-revision service worker caches the complete shell and catalog after the first online visit. HTTPS is needed when hosted outside localhost.
 
 ## Architecture and project structure
 
@@ -67,7 +67,7 @@ The PRNG must never use `Math.random` inside domain generation. Content version 
 
 ```
 { schemaVersion: 1, savedAt: ISO8601, data: {
-  contentVersion: 1, playerName, nextSerial, biomass,
+  contentVersion: 1, playerName, seedBase, nextSerial, nextBattleSerial, biomass,
   inventory: { componentId: quantity }, discoveredComponents: [id],
   discoveredMutations: [id], creatures: [{
     id, signature, generationVersion, seed, componentIds,
@@ -75,11 +75,14 @@ The PRNG must never use `Math.random` inside domain generation. Content version 
     createdAt, creator, history
   }], experiments: [{ serial, creatureId, componentIds, seed,
     compatibility, mutationIds, createdAt }],
-  claimedBattles: [battleId], options: { sound, haptics, reducedMotion, textScale }
+  claimedBattles: [battleId], activeBattle: null | {
+    id, startedAt, round, turnIndex, order, rngState, status, reason, log,
+    units: [{ id, team, source: CreatureSource, hp, energy, shield, statuses, cooldowns }]
+  }, options: { sound, haptics, reducedMotion, textScale }
 }}
 ```
 
-Derived stats, roles, phenotype and ability pool are reconstructed from source data, never trusted from imported saves. Schema and content versions are explicit; unknown versions fail visibly while preserving raw saves. The local adapter retains a previous-write backup. Export/import allows manual portability. Single-player local data cannot protect against deliberate editing; no multiplayer/trading authority is implied.
+Derived stats, roles, phenotype and ability pool are reconstructed from source data, never trusted from imported saves. Battle units retain creature sources as well as transient HP/status/energy state; their stat snapshots are recalculated at decoding. Phase 4 schema-1 saves migrate missing `activeBattle` to null. Schema and content versions are explicit; unknown versions fail visibly while preserving raw saves. The local adapter retains a previous-write backup. Export/import allows manual portability. Single-player local data cannot protect against deliberate editing or manual rollback; no multiplayer/trading authority is implied.
 
 ## Mutation architecture
 
@@ -87,7 +90,7 @@ Rules evaluate tags rather than hard-coded recipes. The slice has one rare, disc
 
 ## Combat architecture
 
-Use a pure turn resolver over immutable battle snapshots: three owned creatures versus three data-defined laboratory opponents. Sort by speed, break ties with stable IDs, skip defeated units, and resolve round boundaries consistently. Actions validate actor, target, learned ability, energy and cooldown before changing state. Basic attack remains available so combat cannot stall. Damage includes armor, seeded critical rolls and elemental resistance; shield absorbs before HP. Status duration ticks on the affected unit's turns. Defeat is temporary and never deletes creatures. A terminal battle produces a unique reward claim; application credits materials and the discovery once. No later-phase reactions, bosses or tower.
+Use a pure turn resolver over immutable battle snapshots: three owned creatures versus three data-defined laboratory opponents. Sort by speed each round (including slow), break ties with stable IDs and skip defeated units. Actions validate actor, target, learned ability, energy and cooldown before changing state. Basic attack remains available so combat cannot stall. `damage = max(1, round(raw / (1 + armor * armorFactor) * resistance * criticalMultiplier))`. Shield absorbs before HP. Burn/poison/regeneration tick at the affected unit's turn start; duration decrements after its action. Shock/weakness reduce outgoing damage. Cooldown N blocks the next N own turns. Energy recovers at turn start. Every player action and all ensuing AI turns are one persisted transaction. Defeat is temporary and never deletes creatures. Retreat grants no resources. A terminal battle produces a unique reward claim; application credits materials and the wing discovery once. A round limit prevents endless healing loops. No later-phase reactions, bosses or tower.
 
 ## Phase plan and acceptance
 

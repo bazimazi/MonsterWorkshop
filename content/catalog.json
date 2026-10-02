@@ -1,45 +1,445 @@
 {
   "version": 1,
   "components": [
-    { "id":"dragon-head","name":"Dragon Head","slot":"head","category":"anatomical","rarity":"common","element":"fire","stats":{"attack":8,"power":5},"genes":{"strength":18,"intelligence":12,"element":16},"abilities":["ember-breath"],"traits":["draconic"],"tags":["dragon","reptile","predator"],"compatibleTags":["electric","crystal"],"conflictTags":[],"energyCost":2,"weight":2,"size":1,"mutationChance":0.01,"visual":{"mesh":"dragon","anchor":"head","scale":1,"allowedScale":[0.85,1.15],"rotation":0,"allowedRotation":[-10,10],"layer":5,"color":"#b8a3ff","inheritColor":0.7},"lore":"A bright-eyed thinker with a furnace behind its smile.","discovery":"starter" },
-    { "id":"wolf-body","name":"Wolf Body","slot":"body","category":"anatomical","rarity":"common","element":"neutral","stats":{"hp":50,"attack":8,"defense":4,"speed":7,"energy":10},"genes":{"vitality":20,"speed":14,"adaptation":12},"abilities":["mend"],"traits":["resilient"],"tags":["mammal","wolf","predator"],"compatibleTags":["reptile"],"conflictTags":[],"energyCost":1,"weight":4,"size":1,"mutationChance":0,"visual":{"mesh":"wolf","anchor":"body","scale":1,"allowedScale":[0.85,1.15],"rotation":0,"allowedRotation":[0,0],"layer":2,"color":"#c5b8ec","inheritColor":0.35},"lore":"A hardy chassis. Four paws, one very promising beginning.","discovery":"starter" },
-    { "id":"spider-legs","name":"Spider Legs","slot":"legs","category":"mobility","rarity":"common","element":"poison","stats":{"speed":10,"attack":4},"genes":{"speed":18,"mutation":12},"abilities":["web-trap"],"traits":["nimble"],"tags":["insect","arachnid","climber"],"compatibleTags":["crystal"],"conflictTags":["mammal"],"energyCost":2,"weight":2,"size":1,"mutationChance":0.04,"visual":{"mesh":"spider","anchor":"legs","scale":1,"allowedScale":[0.9,1.1],"rotation":0,"allowedRotation":[0,0],"layer":1,"color":"#8674b5","inheritColor":0.65},"lore":"A little unsettling. Excellent at getting a grip.","discovery":"starter" },
-    { "id":"lightning-organ","name":"Lightning Organ","slot":"organ","category":"elemental","rarity":"uncommon","element":"lightning","stats":{"power":18,"energy":8},"genes":{"element":28,"intelligence":10,"mutation":14},"abilities":["thunder-pulse"],"traits":["conductive"],"tags":["electric","elemental","experimental"],"compatibleTags":["dragon","crystal"],"conflictTags":[],"energyCost":5,"weight":1,"size":1,"mutationChance":0.06,"visual":{"mesh":"lightning","anchor":"organ","scale":1,"allowedScale":[0.8,1.2],"rotation":0,"allowedRotation":[-5,5],"layer":6,"color":"#ffe094","inheritColor":0},"lore":"Something inside it is counting down to a thunderstorm.","discovery":"starter" },
-    { "id":"crystal-armor","name":"Crystal Armor","slot":"armor","category":"defensive","rarity":"uncommon","element":"crystal","stats":{"hp":12,"defense":16,"speed":-3},"genes":{"stability":20,"vitality":12},"abilities":["crystal-guard"],"traits":["armored"],"tags":["crystal","mineral","defender"],"compatibleTags":["electric","dragon"],"conflictTags":[],"energyCost":3,"weight":5,"size":1,"mutationChance":0.02,"visual":{"mesh":"crystal","anchor":"armor","scale":1,"allowedScale":[0.9,1.1],"rotation":0,"allowedRotation":[0,0],"layer":4,"color":"#88e0d2","inheritColor":0.15},"lore":"A living mineral lattice. Beautiful until it bites back.","discovery":"starter" },
-    { "id":"storm-wings","name":"Storm Wings","slot":"wings","category":"mobility","rarity":"rare","element":"air","stats":{"speed":9,"power":6},"genes":{"speed":14,"adaptation":18},"abilities":["gust"],"traits":["stormborne"],"tags":["avian","flyer","electric"],"compatibleTags":["dragon","elemental"],"conflictTags":[],"energyCost":4,"weight":2,"size":1,"mutationChance":0.04,"visual":{"mesh":"storm","anchor":"wings","scale":1,"allowedScale":[0.9,1.2],"rotation":0,"allowedRotation":[-8,8],"layer":0,"color":"#a5caff","inheritColor":0.45},"lore":"Recovered from the simulator's storm archive. What if you added wings?","discovery":"battle" }
+    {
+      "id": "dragon-head",
+      "name": "Dragon Head",
+      "slot": "head",
+      "category": "anatomical",
+      "rarity": "common",
+      "element": "fire",
+      "stats": { "attack": 8, "power": 5 },
+      "genes": { "strength": 18, "intelligence": 12, "element": 16 },
+      "abilities": ["ember-breath"],
+      "traits": ["draconic"],
+      "tags": ["dragon", "reptile", "predator"],
+      "compatibleTags": ["electric", "crystal"],
+      "conflictTags": [],
+      "energyCost": 2,
+      "weight": 2,
+      "size": 1,
+      "mutationChance": 0.01,
+      "visual": {
+        "mesh": "dragon",
+        "anchor": "head",
+        "scale": 1,
+        "allowedScale": [0.85, 1.15],
+        "rotation": 0,
+        "allowedRotation": [-10, 10],
+        "layer": 5,
+        "color": "#b8a3ff",
+        "inheritColor": 0.7
+      },
+      "lore": "A bright-eyed thinker with a furnace behind its smile.",
+      "discovery": "starter"
+    },
+    {
+      "id": "wolf-body",
+      "name": "Wolf Body",
+      "slot": "body",
+      "category": "anatomical",
+      "rarity": "common",
+      "element": "neutral",
+      "stats": { "hp": 50, "attack": 8, "defense": 4, "speed": 7, "energy": 10 },
+      "genes": { "vitality": 20, "speed": 14, "adaptation": 12 },
+      "abilities": ["mend"],
+      "traits": ["resilient"],
+      "tags": ["mammal", "wolf", "predator"],
+      "compatibleTags": ["reptile"],
+      "conflictTags": [],
+      "energyCost": 1,
+      "weight": 4,
+      "size": 1,
+      "mutationChance": 0,
+      "visual": {
+        "mesh": "wolf",
+        "anchor": "body",
+        "scale": 1,
+        "allowedScale": [0.85, 1.15],
+        "rotation": 0,
+        "allowedRotation": [0, 0],
+        "layer": 2,
+        "color": "#c5b8ec",
+        "inheritColor": 0.35
+      },
+      "lore": "A hardy chassis. Four paws, one very promising beginning.",
+      "discovery": "starter"
+    },
+    {
+      "id": "spider-legs",
+      "name": "Spider Legs",
+      "slot": "legs",
+      "category": "mobility",
+      "rarity": "common",
+      "element": "poison",
+      "stats": { "speed": 10, "attack": 4 },
+      "genes": { "speed": 18, "mutation": 12 },
+      "abilities": ["web-trap"],
+      "traits": ["nimble"],
+      "tags": ["insect", "arachnid", "climber"],
+      "compatibleTags": ["crystal"],
+      "conflictTags": ["mammal"],
+      "energyCost": 2,
+      "weight": 2,
+      "size": 1,
+      "mutationChance": 0.04,
+      "visual": {
+        "mesh": "spider",
+        "anchor": "legs",
+        "scale": 1,
+        "allowedScale": [0.9, 1.1],
+        "rotation": 0,
+        "allowedRotation": [0, 0],
+        "layer": 1,
+        "color": "#8674b5",
+        "inheritColor": 0.65
+      },
+      "lore": "A little unsettling. Excellent at getting a grip.",
+      "discovery": "starter"
+    },
+    {
+      "id": "lightning-organ",
+      "name": "Lightning Organ",
+      "slot": "organ",
+      "category": "elemental",
+      "rarity": "uncommon",
+      "element": "lightning",
+      "stats": { "power": 18, "energy": 8 },
+      "genes": { "element": 28, "intelligence": 10, "mutation": 14 },
+      "abilities": ["thunder-pulse"],
+      "traits": ["conductive"],
+      "tags": ["electric", "elemental", "experimental"],
+      "compatibleTags": ["dragon", "crystal"],
+      "conflictTags": [],
+      "energyCost": 5,
+      "weight": 1,
+      "size": 1,
+      "mutationChance": 0.06,
+      "visual": {
+        "mesh": "lightning",
+        "anchor": "organ",
+        "scale": 1,
+        "allowedScale": [0.8, 1.2],
+        "rotation": 0,
+        "allowedRotation": [-5, 5],
+        "layer": 6,
+        "color": "#ffe094",
+        "inheritColor": 0
+      },
+      "lore": "Something inside it is counting down to a thunderstorm.",
+      "discovery": "starter"
+    },
+    {
+      "id": "crystal-armor",
+      "name": "Crystal Armor",
+      "slot": "armor",
+      "category": "defensive",
+      "rarity": "uncommon",
+      "element": "crystal",
+      "stats": { "hp": 12, "defense": 16, "speed": -3 },
+      "genes": { "stability": 20, "vitality": 12 },
+      "abilities": ["crystal-guard"],
+      "traits": ["armored"],
+      "tags": ["crystal", "mineral", "defender"],
+      "compatibleTags": ["electric", "dragon"],
+      "conflictTags": [],
+      "energyCost": 3,
+      "weight": 5,
+      "size": 1,
+      "mutationChance": 0.02,
+      "visual": {
+        "mesh": "crystal",
+        "anchor": "armor",
+        "scale": 1,
+        "allowedScale": [0.9, 1.1],
+        "rotation": 0,
+        "allowedRotation": [0, 0],
+        "layer": 4,
+        "color": "#88e0d2",
+        "inheritColor": 0.15
+      },
+      "lore": "A living mineral lattice. Beautiful until it bites back.",
+      "discovery": "starter"
+    },
+    {
+      "id": "storm-wings",
+      "name": "Storm Wings",
+      "slot": "wings",
+      "category": "mobility",
+      "rarity": "rare",
+      "element": "air",
+      "stats": { "speed": 9, "power": 6 },
+      "genes": { "speed": 14, "adaptation": 18 },
+      "abilities": ["gust"],
+      "traits": ["stormborne"],
+      "tags": ["avian", "flyer", "electric"],
+      "compatibleTags": ["dragon", "elemental"],
+      "conflictTags": [],
+      "energyCost": 4,
+      "weight": 2,
+      "size": 1,
+      "mutationChance": 0.04,
+      "visual": {
+        "mesh": "storm",
+        "anchor": "wings",
+        "scale": 1,
+        "allowedScale": [0.9, 1.2],
+        "rotation": 0,
+        "allowedRotation": [-8, 8],
+        "layer": 0,
+        "color": "#a5caff",
+        "inheritColor": 0.45
+      },
+      "lore": "Recovered from the simulator's storm archive. What if you added wings?",
+      "discovery": "battle"
+    }
   ],
   "traits": [
-    {"id":"draconic","name":"Draconic","description":"An adaptable elemental frame.","stats":{"power":3},"tags":["mage"]},
-    {"id":"resilient","name":"Resilient","description":"Built to bounce back.","stats":{"hp":8},"tags":["bruiser"]},
-    {"id":"nimble","name":"Nimble","description":"Six more reasons to move quickly.","stats":{"speed":3},"tags":["speedster"]},
-    {"id":"conductive","name":"Conductive","description":"Channels lightning efficiently.","stats":{"power":4},"tags":["mage"]},
-    {"id":"armored","name":"Armored","description":"A lattice that absorbs impacts.","stats":{"defense":4},"tags":["tank"]},
-    {"id":"stormborne","name":"Stormborne","description":"Made for the open sky.","stats":{"speed":3},"tags":["explorer"]},
-    {"id":"overcharged","name":"Overcharged","description":"Wild energy flows through extra crystal growths.","stats":{"power":6},"tags":["mage","mutant"]}
+    {
+      "id": "draconic",
+      "name": "Draconic",
+      "description": "An adaptable elemental frame.",
+      "stats": { "power": 3 },
+      "tags": ["mage"]
+    },
+    {
+      "id": "resilient",
+      "name": "Resilient",
+      "description": "Built to bounce back.",
+      "stats": { "hp": 8 },
+      "tags": ["bruiser"]
+    },
+    {
+      "id": "nimble",
+      "name": "Nimble",
+      "description": "Six more reasons to move quickly.",
+      "stats": { "speed": 3 },
+      "tags": ["speedster"]
+    },
+    {
+      "id": "conductive",
+      "name": "Conductive",
+      "description": "Channels lightning efficiently.",
+      "stats": { "power": 4 },
+      "tags": ["mage"]
+    },
+    {
+      "id": "armored",
+      "name": "Armored",
+      "description": "A lattice that absorbs impacts.",
+      "stats": { "defense": 4 },
+      "tags": ["tank"]
+    },
+    {
+      "id": "stormborne",
+      "name": "Stormborne",
+      "description": "Made for the open sky.",
+      "stats": { "speed": 3 },
+      "tags": ["explorer"]
+    },
+    {
+      "id": "overcharged",
+      "name": "Overcharged",
+      "description": "Wild energy flows through extra crystal growths.",
+      "stats": { "power": 6 },
+      "tags": ["mage", "mutant"]
+    }
   ],
   "abilities": [
-    {"id":"strike","name":"Claw Strike","description":"A reliable physical attack. No energy cost.","tags":["attack","physical"],"cost":0,"cooldown":0,"target":"enemy","effects":[{"type":"damage","power":1,"scaling":"attack","element":"neutral"}]},
-    {"id":"ember-breath","name":"Ember Breath","description":"Fire damage; may burn for two turns.","tags":["attack","fire"],"cost":4,"cooldown":1,"target":"enemy","effects":[{"type":"damage","power":1.1,"scaling":"power","element":"fire"},{"type":"status","status":"burn","duration":2,"chance":0.65,"potency":5}]},
-    {"id":"mend","name":"Cellular Mend","description":"Restore an ally's health.","tags":["healing","support"],"cost":5,"cooldown":2,"target":"ally","effects":[{"type":"heal","power":25}]},
-    {"id":"web-trap","name":"Web Trap","description":"A quick hit that slows for two turns.","tags":["attack","control"],"cost":3,"cooldown":1,"target":"enemy","effects":[{"type":"damage","power":0.85,"scaling":"attack","element":"poison"},{"type":"status","status":"slow","duration":2,"chance":1,"potency":0.35}]},
-    {"id":"thunder-pulse","name":"Thunder Pulse","description":"Lightning damage; shock weakens the next attack.","tags":["attack","lightning"],"cost":6,"cooldown":2,"target":"enemy","effects":[{"type":"damage","power":1.4,"scaling":"power","element":"lightning"},{"type":"status","status":"shock","duration":2,"chance":0.8,"potency":0.25}]},
-    {"id":"crystal-guard","name":"Crystal Guard","description":"Shield yourself against the next blows.","tags":["defense","shield"],"cost":4,"cooldown":2,"target":"self","effects":[{"type":"shield","power":24}]},
-    {"id":"gust","name":"Storm Gust","description":"Air damage with a chance to weaken.","tags":["attack","air"],"cost":4,"cooldown":1,"target":"enemy","effects":[{"type":"damage","power":1.15,"scaling":"power","element":"air"},{"type":"status","status":"weakness","duration":2,"chance":0.7,"potency":0.2}]}
+    {
+      "id": "strike",
+      "name": "Claw Strike",
+      "description": "A reliable physical attack. No energy cost.",
+      "tags": ["attack", "physical"],
+      "cost": 0,
+      "cooldown": 0,
+      "target": "enemy",
+      "effects": [{ "type": "damage", "power": 1, "scaling": "attack", "element": "neutral" }]
+    },
+    {
+      "id": "ember-breath",
+      "name": "Ember Breath",
+      "description": "Fire damage; may burn for two turns.",
+      "tags": ["attack", "fire"],
+      "cost": 4,
+      "cooldown": 1,
+      "target": "enemy",
+      "effects": [
+        { "type": "damage", "power": 1.1, "scaling": "power", "element": "fire" },
+        { "type": "status", "status": "burn", "duration": 2, "chance": 0.65, "potency": 5 }
+      ]
+    },
+    {
+      "id": "mend",
+      "name": "Cellular Mend",
+      "description": "Restore an ally's health.",
+      "tags": ["healing", "support"],
+      "cost": 5,
+      "cooldown": 2,
+      "target": "ally",
+      "effects": [{ "type": "heal", "power": 25 }]
+    },
+    {
+      "id": "web-trap",
+      "name": "Web Trap",
+      "description": "A quick hit that slows for two turns.",
+      "tags": ["attack", "control"],
+      "cost": 3,
+      "cooldown": 1,
+      "target": "enemy",
+      "effects": [
+        { "type": "damage", "power": 0.85, "scaling": "attack", "element": "poison" },
+        { "type": "status", "status": "slow", "duration": 2, "chance": 1, "potency": 0.35 }
+      ]
+    },
+    {
+      "id": "thunder-pulse",
+      "name": "Thunder Pulse",
+      "description": "Lightning damage; shock weakens the next attack.",
+      "tags": ["attack", "lightning"],
+      "cost": 6,
+      "cooldown": 2,
+      "target": "enemy",
+      "effects": [
+        { "type": "damage", "power": 1.4, "scaling": "power", "element": "lightning" },
+        { "type": "status", "status": "shock", "duration": 2, "chance": 0.8, "potency": 0.25 }
+      ]
+    },
+    {
+      "id": "crystal-guard",
+      "name": "Crystal Guard",
+      "description": "Shield yourself against the next blows.",
+      "tags": ["defense", "shield"],
+      "cost": 4,
+      "cooldown": 2,
+      "target": "self",
+      "effects": [{ "type": "shield", "power": 24 }]
+    },
+    {
+      "id": "gust",
+      "name": "Storm Gust",
+      "description": "Air damage with a chance to weaken.",
+      "tags": ["attack", "air"],
+      "cost": 4,
+      "cooldown": 1,
+      "target": "enemy",
+      "effects": [
+        { "type": "damage", "power": 1.15, "scaling": "power", "element": "air" },
+        { "type": "status", "status": "weakness", "duration": 2, "chance": 0.7, "potency": 0.2 }
+      ]
+    }
   ],
   "mutations": [
-    {"id":"electrical-overgrowth","name":"Electrical Overgrowth","description":"Unexpected conductive spines. More elemental power, less stability.","requiredTags":["electric"],"excludedTags":[],"chance":0.16,"stats":{"power":10,"defense":3},"genes":{"mutation":15,"stability":-12},"abilities":["thunder-pulse"],"traits":["overcharged"],"feature":"electric-spines"}
+    {
+      "id": "electrical-overgrowth",
+      "name": "Electrical Overgrowth",
+      "description": "Unexpected conductive spines. More elemental power, less stability.",
+      "requiredTags": ["electric"],
+      "excludedTags": [],
+      "chance": 0.16,
+      "stats": { "power": 10, "defense": 3 },
+      "genes": { "mutation": 15, "stability": -12 },
+      "abilities": ["thunder-pulse"],
+      "traits": ["overcharged"],
+      "feature": "electric-spines"
+    }
   ],
   "rules": {
     "generation": {
-      "version":1,"requiredSlots":["head","body"],"baseCompatibility":60,"sharedTagBonus":3,"affinityBonus":5,"elementBonus":3,"conflictPenalty":16,"energyCapacity":12,"overloadPenalty":3,"baseMutationChance":0.03,"instabilityMutationBonus":0.16,"geneBase":35,"geneVariance":10,"geneStatFactor":0.16,
-      "qualityCompatibilityWeight":0.65,"perLevelGrowth":0.02,"abilityPriority":["organ","armor","legs","head","wings","body"],
-      "baseStats":{"hp":35,"attack":10,"defense":3,"speed":8,"power":9,"energy":10},
-      "qualityBands":[{"quality":"poor","minimum":0,"abilitySlots":3,"traitSlots":2,"growth":0.8},{"quality":"common","minimum":40,"abilitySlots":4,"traitSlots":3,"growth":1},{"quality":"uncommon","minimum":55,"abilitySlots":4,"traitSlots":4,"growth":1.05},{"quality":"rare","minimum":70,"abilitySlots":5,"traitSlots":5,"growth":1.1},{"quality":"superior","minimum":85,"abilitySlots":6,"traitSlots":6,"growth":1.15}],
-      "elementColors":{"neutral":"#c5b8ec","fire":"#ffb68f","water":"#83caff","earth":"#c3c292","air":"#a5caff","lightning":"#ffe094","ice":"#a5e5f8","nature":"#a5dba8","poison":"#c3a4eb","light":"#ffefb6","shadow":"#8b82d1","crystal":"#88e0d2"},
-      "namePrefixes":{"neutral":"Moon","fire":"Ember","water":"Ripple","earth":"Stone","air":"Gale","lightning":"Thunder","ice":"Frost","nature":"Moss","poison":"Venom","light":"Dawn","shadow":"Shade","crystal":"Prism"},
-      "nameSuffixTags":{"arachnid":"weaver","flyer":"wing","wolf":"fang","dragon":"drake"}
+      "version": 1,
+      "requiredSlots": ["head", "body"],
+      "baseCompatibility": 60,
+      "sharedTagBonus": 3,
+      "affinityBonus": 5,
+      "elementBonus": 3,
+      "conflictPenalty": 16,
+      "energyCapacity": 12,
+      "overloadPenalty": 3,
+      "baseMutationChance": 0.03,
+      "instabilityMutationBonus": 0.16,
+      "geneBase": 35,
+      "geneVariance": 10,
+      "geneStatFactor": 0.16,
+      "qualityCompatibilityWeight": 0.65,
+      "perLevelGrowth": 0.02,
+      "abilityPriority": ["organ", "armor", "legs", "head", "wings", "body"],
+      "baseStats": { "hp": 35, "attack": 10, "defense": 3, "speed": 8, "power": 9, "energy": 10 },
+      "qualityBands": [
+        { "quality": "poor", "minimum": 0, "abilitySlots": 3, "traitSlots": 2, "growth": 0.8 },
+        { "quality": "common", "minimum": 40, "abilitySlots": 4, "traitSlots": 3, "growth": 1 },
+        {
+          "quality": "uncommon",
+          "minimum": 55,
+          "abilitySlots": 4,
+          "traitSlots": 4,
+          "growth": 1.05
+        },
+        { "quality": "rare", "minimum": 70, "abilitySlots": 5, "traitSlots": 5, "growth": 1.1 },
+        { "quality": "superior", "minimum": 85, "abilitySlots": 6, "traitSlots": 6, "growth": 1.15 }
+      ],
+      "elementColors": {
+        "neutral": "#c5b8ec",
+        "fire": "#ffb68f",
+        "water": "#83caff",
+        "earth": "#c3c292",
+        "air": "#a5caff",
+        "lightning": "#ffe094",
+        "ice": "#a5e5f8",
+        "nature": "#a5dba8",
+        "poison": "#c3a4eb",
+        "light": "#ffefb6",
+        "shadow": "#8b82d1",
+        "crystal": "#88e0d2"
+      },
+      "namePrefixes": {
+        "neutral": "Moon",
+        "fire": "Ember",
+        "water": "Ripple",
+        "earth": "Stone",
+        "air": "Gale",
+        "lightning": "Thunder",
+        "ice": "Frost",
+        "nature": "Moss",
+        "poison": "Venom",
+        "light": "Dawn",
+        "shadow": "Shade",
+        "crystal": "Prism"
+      },
+      "nameSuffixTags": { "arachnid": "weaver", "flyer": "wing", "wolf": "fang", "dragon": "drake" }
     },
-    "workshop":{"startingBiomass":120,"starterQuantity":5,"baseCost":6,"maxCreatures":60},
-    "combat":{"armorFactor":0.045,"criticalChance":0.1,"criticalMultiplier":1.5,"energyPerTurn":3,"maxRounds":60,"enemyScale":0.72,"victoryBiomass":45,"defeatBiomass":18,"rewardQuantity":3,"rewardComponent":"storm-wings","experience":20,"resistances":[{"attack":"lightning","defense":"earth","multiplier":0.75},{"attack":"fire","defense":"crystal","multiplier":0.8},{"attack":"poison","defense":"fire","multiplier":1.2},{"attack":"air","defense":"poison","multiplier":1.2}],"opponents":[{"name":"Cinder Prototype","components":["dragon-head","wolf-body"],"seed":101},{"name":"Static Prototype","components":["dragon-head","wolf-body","lightning-organ"],"seed":202},{"name":"Prism Prototype","components":["dragon-head","wolf-body","crystal-armor"],"seed":303}]}
+    "workshop": { "startingBiomass": 120, "starterQuantity": 5, "baseCost": 6, "maxCreatures": 60 },
+    "combat": {
+      "armorFactor": 0.045,
+      "criticalChance": 0.1,
+      "criticalMultiplier": 1.5,
+      "energyPerTurn": 3,
+      "maxRounds": 60,
+      "enemyScale": 0.72,
+      "victoryBiomass": 45,
+      "defeatBiomass": 0,
+      "rewardQuantity": 3,
+      "rewardComponent": "storm-wings",
+      "experience": 20,
+      "experiencePerLevel": 100,
+      "resistances": [
+        { "attack": "lightning", "defense": "earth", "multiplier": 0.75 },
+        { "attack": "fire", "defense": "crystal", "multiplier": 0.8 },
+        { "attack": "poison", "defense": "fire", "multiplier": 1.2 },
+        { "attack": "air", "defense": "poison", "multiplier": 1.2 }
+      ],
+      "opponents": [
+        { "name": "Cinder Prototype", "components": ["dragon-head", "wolf-body"], "seed": 101 },
+        {
+          "name": "Static Prototype",
+          "components": ["dragon-head", "wolf-body", "lightning-organ"],
+          "seed": 202
+        },
+        {
+          "name": "Prism Prototype",
+          "components": ["dragon-head", "wolf-body", "crystal-armor"],
+          "seed": 303
+        }
+      ]
+    }
   }
 }

@@ -1,4 +1,6 @@
-export interface Analytics { track(event: string, properties?: Record<string, string | number | boolean>): void }
+export interface Analytics {
+  track(event: string, properties?: Record<string, string | number | boolean>): void;
+}
 export class LocalAnalytics implements Analytics {
   readonly events: { event: string; properties: Record<string, string | number | boolean> }[] = [];
   track(event: string, properties: Record<string, string | number | boolean> = {}): void {
@@ -21,12 +23,14 @@ export class Feedback {
     void this.context.resume();
     const oscillator = this.context.createOscillator();
     const gain = this.context.createGain();
-    oscillator.connect(gain); gain.connect(this.context.destination);
+    oscillator.connect(gain);
+    gain.connect(this.context.destination);
     const now = this.context.currentTime;
     oscillator.type = 'sine';
     oscillator.frequency.setValueAtTime({ select: 440, create: 660, victory: 880 }[kind], now);
     gain.gain.setValueAtTime(0.06, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-    oscillator.start(); oscillator.stop(now + 0.25);
+    oscillator.start();
+    oscillator.stop(now + 0.25);
   }
 }

@@ -6,7 +6,7 @@ export class Navigation {
   }
   get current(): Screen {
     const hash = location.hash.slice(1);
-    return screens.includes(hash as Screen) ? hash as Screen : 'workshop';
+    return screens.includes(hash as Screen) ? (hash as Screen) : 'workshop';
   }
   go(screen: Screen): void {
     if (this.current === screen) this.render(screen);
