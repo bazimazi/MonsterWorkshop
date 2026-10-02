@@ -1,0 +1,22 @@
+{
+  "name": "monster-workshop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "tsc --noEmit",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "test:browser": "npm run build && playwright test",
+    "start": "node scripts/serve.mjs",
+    "dev": "npm run build && node scripts/serve.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.10.1",
+    "typescript": "7.0.2"
+  }
+}
