@@ -18,4 +18,10 @@ Implemented normalized slot validation, symmetric compatibility with explanation
 
 Validation: same seed/anatomy gives identical results, input order is normalized, all 16 anatomies across 120 seeds retain valid stats and roundtrip, and 4,000 manufacturing rolls match forecast within two percentage points. Browser shell displays a generated specimen.
 
-Phases 3–5 are pending. Phases 6–12 are explicitly deferred under the specification's first-slice gate.
+## Phase 3 — Creature visuals
+
+Implemented original modular SVG anatomy for the wolf chassis, dragon head, spider limbs, lightning organ, crystal plating, storm wings and electrical spines. Shared skeleton anchors, bounded scale/rotation and inherited palettes keep attachments coherent; spider limbs replace the default paws. Preview updates immediately, with idle breathing and an OS reduced-motion fallback. The renderer is separate from domain generation and verifies asset coverage.
+
+Validation: 18 unit tests pass. Renderer tests cover every part/anchor, mutation features, escaping and palette blending. Four desktop/mobile browser scenarios pass. Both screenshots were visually inspected: the head, torso, armor, organ and wings remain attached and readable at phone and desktop sizes, with no horizontal overflow.
+
+Phases 4–5 are pending. Phases 6–12 are explicitly deferred under the specification's first-slice gate.
