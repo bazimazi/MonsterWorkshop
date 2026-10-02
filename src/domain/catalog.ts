@@ -67,6 +67,10 @@ export function decodeCatalog(raw: unknown): Catalog {
   if (!(g.requiredSlots as string[]).includes('head') || !(g.requiredSlots as string[]).includes('body')) throw new DomainError('Head and body must be required');
   for (const k of ['baseCompatibility', 'sharedTagBonus', 'affinityBonus', 'elementBonus', 'conflictPenalty', 'energyCapacity', 'overloadPenalty', 'geneBase', 'geneVariance', 'geneStatFactor']) number(g[k], k, 0, 100);
   for (const k of ['baseMutationChance', 'instabilityMutationBonus']) number(g[k], k, 0, 1);
+  for (const k of ['qualityCompatibilityWeight', 'perLevelGrowth']) number(g[k], k, 0, 1);
+  const priority = strings(g.abilityPriority, 'ability priority'); unique(priority, 'ability priority');
+  for (const slot of priority) member(slot, SLOTS, 'ability priority');
+  if (priority.length !== SLOTS.length) throw new DomainError('Ability priority must contain every slot');
   const baseStats = record(g.baseStats, 'base stats'); for (const k of STAT_KEYS) number(baseStats[k], k, 1, 1000);
   const bands = list(g.qualityBands, 'quality bands').map(v => record(v, 'quality band'));
   if (!bands.length || bands[0]?.minimum !== 0) throw new DomainError('Quality bands must start at zero');

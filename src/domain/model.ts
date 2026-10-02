@@ -63,6 +63,7 @@ export interface Catalog {
       affinityBonus: number; elementBonus: number; conflictPenalty: number;
       energyCapacity: number; overloadPenalty: number; baseMutationChance: number;
       instabilityMutationBonus: number; geneBase: number; geneVariance: number; geneStatFactor: number;
+      qualityCompatibilityWeight: number; perLevelGrowth: number; abilityPriority: Slot[];
       baseStats: Stats; qualityBands: QualityBand[];
       elementColors: Record<Element, string>; namePrefixes: Record<Element, string>; nameSuffixTags: Record<string, string>;
     };
