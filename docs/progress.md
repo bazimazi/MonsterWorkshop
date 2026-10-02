@@ -24,4 +24,10 @@ Implemented original modular SVG anatomy for the wolf chassis, dragon head, spid
 
 Validation: 18 unit tests pass. Renderer tests cover every part/anchor, mutation features, escaping and palette blending. Four desktop/mobile browser scenarios pass. Both screenshots were visually inspected: the head, torso, armor, organ and wings remain attached and readable at phone and desktop sizes, with no horizontal overflow.
 
-Phases 4–5 are pending. Phases 6–12 are explicitly deferred under the specification's first-slice gate.
+## Phase 4 — Workshop
+
+Implemented transactional inventory/currency spending, distinct specimen identities, locked discoveries, habitat, immediate anatomy selection/compatibility forecasts, skippable manufacturing and mutation reveal. Creatures can be named, filtered and inspected with genome, abilities, traits and origin. Every manufacture writes an experiment and codex discovery. Settings support sound/haptics, reduced motion, scalable text, validated file import/export and backup recovery; corrupt saves are preserved visibly.
+
+Validation: 23 unit tests and 10 desktop/mobile browser scenarios pass. Tests cover exact spending, deterministic provenance, exhausted/locked inventory, imports, rename/settings, failed-write rollback, full creation/rename/reload/journal flow, invalid anatomy, accessibility options and corrupted-save recovery. Workshop screenshots were visually inspected at both sizes. Touch targets and icon-plus-text labels stay readable, including the larger-text setting.
+
+Phase 5 is pending. Phases 6–12 are explicitly deferred under the specification's first-slice gate.

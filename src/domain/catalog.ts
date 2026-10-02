@@ -40,7 +40,7 @@ export function decodeCatalog(raw: unknown): Catalog {
     member(p.discovery, ['starter', 'battle'], 'discovery'); modifiers(p.stats, STAT_KEYS, 'component stats'); modifiers(p.genes, GENES, 'component genes');
     references(p.abilities, abilityIds, 'ability'); references(p.traits, traitIds, 'trait');
     for (const k of ['tags', 'compatibleTags', 'conflictTags']) strings(p[k], k);
-    for (const k of ['energyCost', 'weight']) number(p[k], k, 0, 1000);
+    number(p.energyCost, 'energy cost', 0, 1000, true); number(p.weight, 'weight', 0, 1000);
     number(p.size, 'size', 0.1, 3); number(p.mutationChance, 'mutation chance', 0, 1);
     const v = record(p.visual, 'visual'); string(v.mesh, 'mesh'); member(v.anchor, SLOTS, 'anchor');
     if (v.anchor !== p.slot) throw new DomainError('Visual anchor must match the component slot');

@@ -9,11 +9,55 @@ test('game shell loads content with no runtime errors', async ({ page }) => {
 });
 test('modular preview changes anatomy immediately without horizontal overflow', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: 'Spider Legs' }).click();
   await expect(page.locator('[data-slot="legs"]')).toBeVisible();
   await page.getByRole('button', { name: 'Spider Legs' }).click();
   await expect(page.locator('[data-slot="legs"]')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Storm Wings' }).click();
-  await expect(page.locator('[data-slot="wings"]')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Unknown component' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Lightning Organ' }).click();
+  await expect(page.locator('[data-slot="organ"]')).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-  await page.screenshot({ path: `artifacts/phase3-${test.info().project.name}.png`, fullPage: true });
+  await page.screenshot({ path: `artifacts/workshop-${test.info().project.name}.png`, fullPage: true });
+});
+test('manufacture, reveal, rename, journal and reload preserve the invention', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button',{name:'Lightning Organ'}).click();
+  await page.getByRole('button',{name:'Manufacture creature'}).click();
+  await page.getByRole('button',{name:'Skip sequence'}).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByRole('button',{name:'Meet your creature'}).click();
+  await expect(page.getByRole('heading',{name:'The habitat'})).toBeVisible();
+  await page.getByRole('textbox',{name:'Name your creation'}).fill('Pip the Impossible');
+  await page.getByRole('button',{name:'Save name'}).click();
+  await page.reload();
+  await expect(page.getByRole('button',{name:'Pip the Impossible'})).toBeVisible();
+  await page.getByRole('link',{name:'Journal',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Pip the Impossible'})).toBeVisible();
+  const save=await page.evaluate(()=>JSON.parse(localStorage.getItem('monster-workshop.save')).data);
+  expect(save.creatures).toHaveLength(1);expect(save.experiments).toHaveLength(1);expect(save.inventory['dragon-head']).toBe(4);
+});
+test('reduced motion and larger text persist; invalid anatomy cannot manufacture', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button',{name:'Dragon Head'}).click();
+  await expect(page.getByRole('button',{name:'Manufacture creature'})).toBeDisabled();
+  await page.getByRole('link',{name:'Settings',exact:true}).click();
+  await page.getByRole('checkbox',{name:'Reduce animation'}).check();
+  await page.getByRole('combobox',{name:'Text size'}).selectOption('1.3');
+  await page.getByRole('link',{name:'Workshop',exact:true}).click();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.reload();
+  await expect(page.locator('body')).toHaveClass('reduced-motion');
+  await expect(page.locator('.creature-svg.idle')).toHaveCount(0);
+});
+test('corrupt save is preserved and the previous valid backup restores', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button',{name:'Manufacture creature'}).click();
+  await page.getByRole('button',{name:'Skip sequence'}).click();
+  await page.getByRole('button',{name:'Keep experimenting'}).click();
+  await page.evaluate(()=>localStorage.setItem('monster-workshop.save','{broken'));
+  await page.reload();
+  await expect(page.getByRole('heading',{name:'Your workshop needs attention.'})).toBeVisible();
+  expect(await page.evaluate(()=>localStorage.getItem('monster-workshop.save'))).toBe('{broken');
+  await page.getByRole('button',{name:'Restore backup'}).click();
+  await expect(page.getByRole('heading',{name:'What will you create?'})).toBeVisible();
 });
