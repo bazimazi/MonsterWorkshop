@@ -12,6 +12,7 @@ import { escape, title } from './html.js';
 import { availableAbilities, canUse, currentActor } from '../domain/combat.js';
 import type { Battle, Combatant } from '../domain/combat.js';
 import { deriveCreature } from '../domain/generator.js';
+import { explorationView } from './exploration.js';
 import type { BattleReward } from '../application/workshop.js';
 export function downloadSave(raw: string): void {
   const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' })),
@@ -53,13 +54,18 @@ export class GameUI {
   private selectedTarget: string | undefined;
   private lastActor: string | undefined;
   private reward: BattleReward | undefined;
+  private regionId = 'green-meadow';
+  private explorerId: string | undefined;
+  private lastTick = performance.now();
+  private clockFailed = false;
   constructor(
     private root: HTMLElement,
     private workshop: Workshop,
     private content: ContentIndex,
   ) {
     for (const part of content.components.values())
-      if (part.slot === 'head' || part.slot === 'body') this.selected.add(part.id);
+      if (part.discovery === 'starter' && (part.slot === 'head' || part.slot === 'body'))
+        this.selected.add(part.id);
     this.nav = new Navigation(() => {
       this.render();
       this.root.querySelector<HTMLElement>('h1')?.focus();
@@ -86,7 +92,38 @@ export class GameUI {
       (event) =>
         void this.change(event.target as HTMLInputElement).catch((error) => this.fail(error)),
     );
+    document.addEventListener('visibilitychange', () => {
+      this.lastTick = performance.now();
+    });
+    setInterval(() => this.tick(), 1000);
     this.render();
+  }
+  private tick(): void {
+    const now = performance.now(),
+      elapsed = Math.max(0, Math.min(1000, Math.floor(now - this.lastTick)));
+    this.lastTick = now;
+    if (document.hidden || this.clockFailed) return;
+    try {
+      this.workshop.advanceExpeditions(elapsed);
+      for (const job of this.workshop.state.expeditions) {
+        const card = this.root.querySelector<HTMLElement>(`[data-job="${job.id}"]`);
+        if (!card) continue;
+        const duration = this.content.region(job.regionId).durationMs,
+          ready = job.elapsedMs >= duration;
+        const progress = card.querySelector<HTMLProgressElement>('progress');
+        if (progress) progress.value = job.elapsedMs;
+        const remaining = card.querySelector('[data-remaining]');
+        if (remaining)
+          remaining.textContent = ready
+            ? 'Ready to collect'
+            : `${Math.ceil((duration - job.elapsedMs) / 1000)}s remaining`;
+        const claim = card.querySelector<HTMLButtonElement>('[data-action="claim-expedition"]');
+        if (claim) claim.disabled = !ready;
+      }
+    } catch (error) {
+      this.clockFailed = true;
+      this.fail(error);
+    }
   }
   private animated(): boolean {
     return (
@@ -111,23 +148,25 @@ export class GameUI {
     this.applyOptions(state);
     const screen = this.nav.current;
     const body =
-      screen === 'creatures'
-        ? this.creaturesView(state)
-        : screen === 'battle'
-          ? this.battleView(state)
-          : screen === 'journal'
-            ? this.journalView(state)
-            : screen === 'settings'
-              ? this.settingsView(state)
-              : this.workshopView(state);
+      screen === 'explore'
+        ? explorationView(state, this.workshop, this.content, this.regionId, this.explorerId)
+        : screen === 'creatures'
+          ? this.creaturesView(state)
+          : screen === 'battle'
+            ? this.battleView(state)
+            : screen === 'journal'
+              ? this.journalView(state)
+              : screen === 'settings'
+                ? this.settingsView(state)
+                : this.workshopView(state);
     const tabs: [Screen, string, string][] = [
       ['workshop', 'Workshop', '⚗'],
       ['creatures', 'Creatures', '◈'],
       ['battle', 'Battle', '⚔'],
       ['journal', 'Journal', '≡'],
-      ['settings', 'Settings', '⚙'],
+      ['explore', 'Explore', '❧'],
     ];
-    this.root.innerHTML = `<header class="topbar"><a class="brand" href="#workshop"><img src="./icon.svg" alt="" width="36" height="36"><span>MONSTER<span class="brand-light">WORKSHOP</span></span></a><div class="resource"><span class="resource-dot" aria-hidden="true"></span><strong>${state.biomass}</strong><span>biomass</span></div></header><nav class="navigation" aria-label="Main navigation">${tabs.map(([key, label, symbol]) => `<a href="#${key}" ${screen === key ? 'aria-current="page"' : ''}><span aria-hidden="true">${symbol}</span>${label}${key === 'creatures' ? `<small>${state.creatures.length}</small>` : ''}</a>`).join('')}</nav><main class="shell game-shell">${this.notice ? `<div class="notice ${this.isError ? 'error' : ''}" role="${this.isError ? 'alert' : 'status'}">${escape(this.notice)}<button class="quiet" data-action="dismiss" aria-label="Dismiss message">×</button></div>` : ''}${body}</main><footer class="footer">A little science. A little strange. <span>Saved on this device</span></footer>${this.modal()}`;
+    this.root.innerHTML = `<header class="topbar"><a class="brand" href="#workshop"><img src="./icon.svg" alt="" width="36" height="36"><span>MONSTER<span class="brand-light">WORKSHOP</span></span></a><div class="resource"><span class="resource-dot" aria-hidden="true"></span><strong>${state.biomass}</strong><span>biomass</span></div><a class="utility-link" href="#settings" aria-label="Settings">&#9881;</a></header><nav class="navigation" aria-label="Main navigation">${tabs.map(([key, label, symbol]) => `<a href="#${key}" ${screen === key ? 'aria-current="page"' : ''}><span aria-hidden="true">${symbol}</span>${label}${key === 'creatures' ? `<small>${state.creatures.length}</small>` : ''}</a>`).join('')}</nav><main class="shell game-shell">${this.notice ? `<div class="notice ${this.isError ? 'error' : ''}" role="${this.isError ? 'alert' : 'status'}">${escape(this.notice)}<button class="quiet" data-action="dismiss" aria-label="Dismiss message">×</button></div>` : ''}${body}</main><footer class="footer">A little science. A little strange. <span>Saved on this device</span></footer>${this.modal()}`;
     const dialog = this.root.querySelector<HTMLDialogElement>('dialog');
     if (dialog) {
       dialog.showModal();
@@ -184,7 +223,7 @@ export class GameUI {
         const discovered = state.discoveredComponents.includes(p.id),
           selected = this.selected.has(p.id),
           quantity = state.inventory[p.id] ?? 0;
-        return `<button class="part ${selected ? 'selected' : ''} ${!discovered ? 'locked' : ''}" data-action="part" data-part="${p.id}" aria-pressed="${selected}" ${!discovered || (!selected && quantity === 0) ? 'disabled' : ''}><span class="part-icon" aria-hidden="true">${discovered ? { head: '♜', body: '◆', legs: '╳', organ: 'ϟ', armor: '⬡', wings: '⋈' }[p.slot] : '?'}</span><span class="part-copy"><strong>${discovered ? escape(p.name) : 'Unknown component'}</strong><small>${title(p.slot)} · ${discovered ? title(p.element) : 'Win a battle to discover'}</small></span><span class="quantity">${discovered ? '×' + quantity : 'LOCKED'}</span></button>`;
+        return `<button class="part ${selected ? 'selected' : ''} ${!discovered ? 'locked' : ''}" data-action="part" data-part="${p.id}" aria-pressed="${selected}" ${!discovered || (!selected && quantity === 0) ? 'disabled' : ''}><span class="part-icon" aria-hidden="true">${discovered ? { head: '♜', body: '◆', legs: '╳', organ: 'ϟ', armor: '⬡', wings: '⋈' }[p.slot] : '?'}</span><span class="part-copy"><strong>${discovered ? escape(p.name) : 'Unknown component'}</strong><small>${title(p.slot)} · ${discovered ? title(p.element) : p.discovery === 'battle' ? 'Win a battle to discover' : p.discovery === 'expedition' ? 'Explore a region to discover' : 'Research to discover'}</small></span><span class="quantity">${discovered ? '×' + quantity : 'LOCKED'}</span></button>`;
       })
       .join(
         '',
@@ -256,11 +295,18 @@ export class GameUI {
     if (!battle) {
       const creatures = this.workshop.creatures;
       if (!this.squadInitialized && creatures.length >= 3) {
-        this.squad = new Set(creatures.slice(0, 3).map((c) => c.id));
+        this.squad = new Set(
+          creatures
+            .filter((c) => !this.workshop.isAssigned(c.id))
+            .slice(0, 3)
+            .map((c) => c.id),
+        );
         this.squadInitialized = true;
       }
-      for (const id of this.squad) if (!creatures.some((c) => c.id === id)) this.squad.delete(id);
-      return `${heading}<section class="panel"><div class="section-title"><h2>Choose your field team</h2><span class="tag">${this.squad.size} / 3 SELECTED</span></div><p class="muted">${creatures.length < 3 ? 'Manufacture three creatures to begin. Every team member must be your own invention.' : 'Mix armor, speed and elemental power. Tap a specimen to change the squad.'}</p>${creatures.length ? `<div class="creature-grid squad-grid">${creatures.map((c) => `<button class="panel creature-card ${this.squad.has(c.id) ? 'squad-selected' : ''}" data-action="squad" data-id="${escape(c.id)}" aria-pressed="${this.squad.has(c.id)}">${renderCreature(c, this.content, false)}<strong>${escape(c.name)}</strong><span class="card-meta">${title(c.element)} · ${c.stats.hp} HP · ${c.stats.speed} speed</span><span class="tag">${this.squad.has(c.id) ? '✓ SELECTED' : 'ADD TO SQUAD'}</span></button>`).join('')}</div>` : '<div class="empty"><p>Your first team is waiting to be built.</p><a class="primary" href="#workshop">Return to the workshop</a></div>'}<div class="battle-start"><p class="micro">Victory earns biomass, components and a new discovery. Defeated creatures recover. No entry cost.</p><button class="primary" data-action="start-battle" ${this.squad.size !== 3 ? 'disabled' : ''}>Start field test</button></div></section>`;
+      for (const id of this.squad)
+        if (!creatures.some((c) => c.id === id) || this.workshop.isAssigned(id))
+          this.squad.delete(id);
+      return `${heading}<section class="panel"><div class="section-title"><h2>Choose your field team</h2><span class="tag">${this.squad.size} / 3 SELECTED</span></div><p class="muted">${creatures.length < 3 ? 'Manufacture three creatures to begin. Every team member must be your own invention.' : 'Mix armor, speed and elemental power. Tap a specimen to change the squad.'}</p>${creatures.length ? `<div class="creature-grid squad-grid">${creatures.map((c) => `<button class="panel creature-card ${this.squad.has(c.id) ? 'squad-selected' : ''}" data-action="squad" data-id="${escape(c.id)}" aria-pressed="${this.squad.has(c.id)}" ${this.workshop.isAssigned(c.id) ? 'disabled' : ''}>${renderCreature(c, this.content, false)}<strong>${escape(c.name)}</strong><span class="card-meta">${title(c.element)} · ${c.stats.hp} HP · ${c.stats.speed} speed</span><span class="tag">${this.squad.has(c.id) ? '✓ SELECTED' : 'ADD TO SQUAD'}</span></button>`).join('')}</div>` : '<div class="empty"><p>Your first team is waiting to be built.</p><a class="primary" href="#workshop">Return to the workshop</a></div>'}<div class="battle-start"><p class="micro">Victory earns biomass, components and a new discovery. Defeated creatures recover. No entry cost.</p><button class="primary" data-action="start-battle" ${this.squad.size !== 3 ? 'disabled' : ''}>Start field test</button></div></section>`;
     }
     const actor = currentActor(battle);
     if (actor && actor.id !== this.lastActor) {
@@ -347,7 +393,12 @@ export class GameUI {
     if (action === 'part') {
       const id = button.dataset.part!;
       if (this.selected.has(id)) this.selected.delete(id);
-      else this.selected.add(id);
+      else {
+        const slot = this.content.component(id).slot;
+        for (const chosen of this.selected)
+          if (this.content.component(chosen).slot === slot) this.selected.delete(chosen);
+        this.selected.add(id);
+      }
       this.feedback.play('select');
       this.notice = '';
       this.render(id);
@@ -378,6 +429,29 @@ export class GameUI {
       this.root
         .querySelector('#specimen-detail')
         ?.scrollIntoView({ behavior: this.animated() ? 'smooth' : 'instant', block: 'start' });
+    }
+    if (action === 'region') {
+      this.regionId = button.dataset.region!;
+      this.render();
+    }
+    if (action === 'start-expedition') {
+      if (!this.explorerId) throw new Error('Choose an explorer');
+      this.workshop.startExpedition(this.regionId, this.explorerId, new Date().toISOString());
+      this.lastTick = performance.now();
+      this.explorerId = undefined;
+      this.notice = 'Your explorer is on its way.';
+      this.render();
+    }
+    if (action === 'claim-expedition') {
+      const reward = this.workshop.claimExpedition(button.dataset.id!);
+      this.notice = `Expedition collected: +${reward.biomass} biomass${reward.discovery ? ' / Recovered ' + this.content.component(reward.discovery).name : ''}.`;
+      this.feedback.play('victory');
+      this.render();
+    }
+    if (action === 'cancel-expedition') {
+      this.workshop.cancelExpedition(button.dataset.id!);
+      this.notice = 'Your explorer returned safely.';
+      this.render();
     }
     if (action === 'export') downloadSave(this.workshop.exportSave());
     if (action === 'backup') {
@@ -441,15 +515,15 @@ export class GameUI {
       this.reward = undefined;
       const state = this.workshop.state;
       this.selected = new Set(
-        this.content.catalog.components
-          .filter(
-            (p) =>
-              (state.inventory[p.id] ?? 0) > 0 &&
-              (this.content.catalog.rules.generation.requiredSlots.includes(p.slot) ||
-                p.id === this.content.catalog.rules.combat.rewardComponent),
-          )
-          .map((p) => p.id),
+        this.content.catalog.rules.generation.requiredSlots.map(
+          (slot) =>
+            this.content.catalog.components.find(
+              (p) => p.slot === slot && (state.inventory[p.id] ?? 0) > 0,
+            )!.id,
+        ),
       );
+      const discovery = this.content.catalog.rules.combat.rewardComponent;
+      if ((state.inventory[discovery] ?? 0) > 0) this.selected.add(discovery);
       this.nav.go('workshop');
     }
     if (action === 'new-test') {
@@ -458,6 +532,10 @@ export class GameUI {
     }
   }
   private async change(input: HTMLInputElement): Promise<void> {
+    if (input.dataset.explorer) {
+      this.explorerId = input.value || undefined;
+      this.render();
+    }
     if (input.dataset.filter) {
       this.filter = input.value;
       this.render();
@@ -483,6 +561,8 @@ export class GameUI {
         ),
       );
       this.inspectedId = undefined;
+      this.explorerId = undefined;
+      this.lastTick = performance.now();
       this.reward = undefined;
       this.squadInitialized = false;
       this.squad.clear();

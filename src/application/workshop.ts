@@ -2,7 +2,7 @@ import type { ContentIndex } from '../domain/catalog.js';
 import type { Creature } from '../domain/model.js';
 import { deriveCreature, generateCreature, validateAnatomy } from '../domain/generator.js';
 import { decodeCreature } from '../domain/serialization.js';
-import { DomainError, date, string } from '../domain/validation.js';
+import { DomainError, date, number, string } from '../domain/validation.js';
 import { hash } from '../domain/random.js';
 import type { SaveRepository } from '../platform/save.js';
 import type { Analytics } from '../platform/services.js';
@@ -16,6 +16,12 @@ import {
   runEnemyTurns,
 } from '../domain/combat.js';
 import type { Action, Battle } from '../domain/combat.js';
+import {
+  advanceExpedition,
+  expeditionRequirements,
+  expeditionReward,
+} from '../domain/exploration.js';
+import type { Expedition, ExpeditionReward } from '../domain/exploration.js';
 export interface BattleReward {
   victory: boolean;
   biomass: number;
@@ -39,6 +45,106 @@ export class Workshop {
   }
   get creatures(): Creature[] {
     return this.value.creatures.map((c) => deriveCreature(c, this.content));
+  }
+  isAssigned(id: string): boolean {
+    return (
+      this.value.expeditions.some((e) => e.source.id === id) ||
+      !!this.value.activeBattle?.units.some((u) => u.team === 'player' && u.source.id === id)
+    );
+  }
+  get completedRegions(): string[] {
+    return [
+      ...new Set(
+        this.value.expeditionReports
+          .filter((r) => r.outcome === 'collected')
+          .map((r) => r.regionId),
+      ),
+    ];
+  }
+  startExpedition(regionId: string, creatureId: string, at: string): Expedition {
+    date(at, 'departure time');
+    const region = this.content.region(regionId),
+      creature = this.creatures.find((c) => c.id === creatureId);
+    const reasons = expeditionRequirements(region, creature, this.completedRegions, this.content);
+    if (reasons.length) throw new DomainError(reasons.join(' '));
+    if (this.isAssigned(creatureId)) throw new DomainError('This creature is already assigned');
+    if (this.value.expeditions.length >= this.content.catalog.rules.exploration.maxAssignments)
+      throw new DomainError('All expedition slots are occupied');
+    const serial = this.value.nextExpeditionSerial,
+      id = `expedition-${this.value.seedBase}-${serial}`;
+    const job: Expedition = {
+      id,
+      serial,
+      regionId,
+      source: decodeCreature(creature!, this.content),
+      seed: hash(id),
+      elapsedMs: 0,
+      startedAt: at,
+    };
+    this.transact((next) => {
+      next.expeditions.push(job);
+      next.nextExpeditionSerial++;
+    });
+    this.analytics.track('expedition_started', { region: regionId });
+    return structuredClone(job);
+  }
+  advanceExpeditions(elapsedMs: number): void {
+    number(elapsedMs, 'active play interval', 0, 1000, true);
+    if (
+      !elapsedMs ||
+      !this.value.expeditions.some((e) => e.elapsedMs < this.content.region(e.regionId).durationMs)
+    )
+      return;
+    this.transact((next) => {
+      next.expeditions = next.expeditions.map((job) =>
+        advanceExpedition(job, elapsedMs, this.content),
+      );
+    });
+  }
+  claimExpedition(id: string): ExpeditionReward {
+    const job = this.value.expeditions.find((e) => e.id === id);
+    if (!job) throw new DomainError('No unclaimed expedition');
+    const reward = expeditionReward(job, this.content, this.value.discoveredComponents);
+    const fresh = reward.discovery && !this.value.discoveredComponents.includes(reward.discovery);
+    this.transact((next) => {
+      next.biomass += reward.biomass;
+      for (const [resource, quantity] of Object.entries(reward.resources))
+        next.resources[resource] = (next.resources[resource] ?? 0) + quantity;
+      for (const [component, quantity] of Object.entries(reward.components))
+        next.inventory[component] = (next.inventory[component] ?? 0) + quantity;
+      if (fresh) next.discoveredComponents.push(reward.discovery!);
+      const creature = next.creatures.find((c) => c.id === job.source.id)!;
+      creature.experience += reward.experience;
+      creature.level = Math.min(
+        100,
+        1 + Math.floor(creature.experience / this.content.catalog.rules.combat.experiencePerLevel),
+      );
+      if (fresh) creature.history.discoveries++;
+      next.expeditionReports.push({
+        id,
+        regionId: job.regionId,
+        creatureId: job.source.id,
+        outcome: 'collected',
+        reward,
+      });
+      next.expeditions = next.expeditions.filter((e) => e.id !== id);
+    });
+    this.analytics.track('expedition_completed', { region: job.regionId, discovery: !!fresh });
+    return structuredClone(reward);
+  }
+  cancelExpedition(id: string): void {
+    const job = this.value.expeditions.find((e) => e.id === id);
+    if (!job) throw new DomainError('Expedition not found');
+    this.transact((next) => {
+      next.expeditions = next.expeditions.filter((e) => e.id !== id);
+      next.expeditionReports.push({
+        id,
+        regionId: job.regionId,
+        creatureId: job.source.id,
+        outcome: 'cancelled',
+        reward: null,
+      });
+    });
   }
   cost(ids: string[]): number {
     return (
@@ -129,6 +235,8 @@ export class Workshop {
     const players = ids.map((id) => {
       const c = this.creatures.find((c) => c.id === id);
       if (!c) throw new DomainError('Choose owned creatures');
+      if (this.isAssigned(id))
+        throw new DomainError('An expedition creature cannot enter a field test');
       return c;
     });
     const enemies = this.content.catalog.rules.combat.opponents.map((o, index) => {
@@ -191,7 +299,7 @@ export class Workshop {
       for (const p of this.content.components.values())
         if (
           p.discovery === 'starter' ||
-          this.value.discoveredComponents.includes(p.id) ||
+          (p.discovery === 'battle' && this.value.discoveredComponents.includes(p.id)) ||
           p.id === rules.rewardComponent
         )
           quantities[p.id] = rules.rewardQuantity;

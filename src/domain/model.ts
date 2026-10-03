@@ -79,7 +79,7 @@ export interface Component {
   mutationChance: number;
   visual: VisualDefinition;
   lore: string;
-  discovery: 'starter' | 'battle';
+  discovery: 'starter' | 'battle' | 'expedition' | 'research';
 }
 export interface Trait {
   id: string;
@@ -172,12 +172,36 @@ export interface QualityBand {
   traitSlots: number;
   growth: number;
 }
+export interface Resource {
+  id: string;
+  name: string;
+  description: string;
+}
+export interface Region {
+  id: string;
+  name: string;
+  description: string;
+  activity: string;
+  durationMs: number;
+  prerequisites: string[];
+  requiredTags: string[];
+  minimumStats: StatModifiers;
+  affinityTags: string[];
+  biomass: number;
+  resource: string;
+  quantity: number;
+  restock: string[];
+  discovery: string;
+  discoveryChance: number;
+}
 export interface Catalog {
   version: number;
   components: Component[];
   traits: Trait[];
   abilities: Ability[];
   mutations: Mutation[];
+  resources: Resource[];
+  regions: Region[];
   rules: {
     generation: {
       version: number;
@@ -224,6 +248,16 @@ export interface Catalog {
       experiencePerLevel: number;
       resistances: { attack: Element; defense: Element; multiplier: number }[];
       opponents: { name: string; components: string[]; seed: number }[];
+    };
+    exploration: {
+      maxAssignments: number;
+      affinityWeight: number;
+      adaptationWeight: number;
+      speedWeight: number;
+      yieldBonus: number;
+      discoveryBonus: number;
+      restockQuantity: number;
+      experience: number;
     };
   };
 }

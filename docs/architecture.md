@@ -78,7 +78,10 @@ The PRNG must never use `Math.random` inside domain generation. Content version 
   claimedBattles: [battleId], activeBattle: null | {
     id, startedAt, round, turnIndex, order, rngState, status, reason, log,
     units: [{ id, team, source: CreatureSource, hp, energy, shield, statuses, cooldowns }]
-  }, options: { sound, haptics, reducedMotion, textScale }
+  }, nextExpeditionSerial, resources: { resourceId: quantity },
+  expeditions: [{ id, serial, regionId, source: CreatureSource, seed, elapsedMs, startedAt }],
+  expeditionReports: [{ id, regionId, creatureId, outcome, reward }],
+  options: { sound, haptics, reducedMotion, textScale }
 }}
 ```
 
@@ -101,4 +104,14 @@ Use a pure turn resolver over immutable battle snapshots: three owned creatures 
 4. Workshop: inventory/storage, touch component selection, prediction, manufacture/reveal/rename, codex and experiment log. Test atomic operations and reload.
 5. Combat: full 3v3 action loop, abilities/statuses, victory/defeat, repeatable rewards and new wing discovery. Unit/combat/property tests, economy loop simulation, mobile browser tests and offline reload. Document milestone reviews and known limits, commit completed phase.
 
-Each phase gets its own commit after checks pass. Later-phase systems are neither implemented nor represented as completed placeholders.
+6. Exploration: biome gathering, specialization, prerequisites, resource storage and reusable discoveries; verify all regions, clock behavior, transactional claims and phone/desktop rendering.
+
+Each phase gets its own commit after checks pass. Following the first-slice delivery, the user requested continued implementation. Breeding retains the plan's explicit enjoyable-creation-loop gate.
+
+## Exploration architecture
+
+Regions and resources live in the catalog. Region dependencies are checked for cycles and references. Requirements use creature biology tags and stats. Fitness is a weighted blend of tag affinity, adaptation genes and speed, with all coefficients in content rules. A snapshot at departure fixes fitness for the assignment. Rewards are recomputed from this source and seed, and the first region discovery is guaranteed. Starter restocks remain biome-specific; battle rewards do not replenish expedition components.
+
+A creature can occupy one expedition or one battle team at a time. Each assignment has a monotonic serial identity; collecting or recalling moves it into a report ledger. Claims update currency, resources, components, discovery, experience and assignment state in one validated save. Failed writes roll back all changes. Decoding rejects duplicate assignments/claims, impossible progress and mismatched ownership/snapshots.
+
+The browser supplies at most one second of foreground `performance.now()` progress per tick. Visibility changes reset the interval baseline; background suspensions and closed-game wall time grant no progress. No duration is derived from `Date.now()` or saved timestamps. The paused behavior is explicit in the UI. Additive schema-1 migration initializes missing expedition fields while retaining existing creature sources and content version 1.

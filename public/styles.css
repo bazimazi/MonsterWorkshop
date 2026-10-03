@@ -1311,3 +1311,130 @@ select {
     font-size: 0.62rem;
   }
 }
+
+.utility-link {
+  display: grid;
+  place-items: center;
+  min-width: 48px;
+  min-height: 48px;
+  text-decoration: none;
+  font-size: 1.4rem;
+}
+.exploration-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.region-list {
+  display: grid;
+  gap: 10px;
+}
+.region-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-align: left;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #151a2d;
+  color: var(--text);
+}
+.region-card.selected {
+  border-color: var(--mint);
+  background: #213333;
+}
+.region-card strong,
+.region-card small {
+  display: block;
+}
+.region-card small {
+  color: var(--muted);
+  margin-top: 4px;
+}
+.region-art {
+  display: grid;
+  place-items: center;
+  flex: 0 0 54px;
+  height: 54px;
+  border-radius: 12px;
+  font-size: 2rem;
+  background: radial-gradient(ellipse at top, #526c48, #203c32);
+  color: #beeba7;
+}
+.region-1 {
+  background: radial-gradient(ellipse at top, #7966ae, #2d244b);
+  color: #d1b5ff;
+}
+.region-2 {
+  background: radial-gradient(ellipse at top, #426c92, #203446);
+  color: #9adce3;
+}
+.explorer-picker {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+}
+.explorer-picker select {
+  width: 100%;
+  min-height: 48px;
+}
+.explorer-preview {
+  max-width: 260px;
+  margin: 0 auto;
+}
+.assignment-panel > .primary {
+  width: 100%;
+  margin-top: 12px;
+}
+.requirement {
+  color: var(--danger);
+}
+.expedition-queue {
+  margin-bottom: 24px;
+}
+.expedition-job {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+.expedition-progress {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.expedition-progress progress {
+  width: 100%;
+  accent-color: var(--mint);
+}
+.job-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.field-report {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+@media (max-width: 700px) {
+  .exploration-layout {
+    grid-template-columns: 1fr;
+  }
+  .expedition-job {
+    grid-template-columns: 1fr;
+  }
+  .job-actions {
+    justify-content: space-between;
+  }
+  .topbar {
+    gap: 8px;
+  }
+  .utility-link {
+    min-width: 44px;
+  }
+}

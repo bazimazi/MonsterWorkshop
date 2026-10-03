@@ -10,7 +10,16 @@ const anchors: Record<Slot, [number, number]> = {
   organ: [200, 188],
   wings: [200, 170],
 };
-export const MESH_KEYS = ['wolf', 'dragon', 'spider', 'crystal', 'lightning', 'storm'];
+export const MESH_KEYS = [
+  'wolf',
+  'dragon',
+  'spider',
+  'crystal',
+  'lightning',
+  'storm',
+  'herbal',
+  'crystal-beast',
+];
 const visualCaches = new WeakMap<ContentIndex, Map<string, string>>();
 const MAX_CACHED_VISUALS = 128;
 export function blend(a: string, b: string, ratio: number): string {
@@ -28,6 +37,10 @@ function mesh(key: string, color: string, glow: string, hasLegs: boolean): strin
     light = blend(color, '#ffffff', 0.27);
   const line = 'stroke="#302741" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"';
   switch (key) {
+    case 'crystal-beast':
+      return `${mesh('wolf', color, glow, hasLegs)}<g ${line}><path d="M-66 -14 -70 -57 -42 -33 -36 -68 -14 -50 -20 -14Z M66 -14 70 -57 42 -33 36 -68 14 -50 20 -14Z" fill="${light}"/><path d="M-45 -39 -39 -20 M45 -39 39 -20" stroke="${glow}"/></g>`;
+    case 'herbal':
+      return `<g ${line}><ellipse cy="8" rx="20" ry="24" fill="${dark}"/><path d="M0 22Q-40 -10 -24 -26Q0 -26 0 22 Q40 -10 24 -26Q0 -26 0 22Z" fill="${color}"/><path d="M0 23 -18 -15M0 23 18 -15" stroke="${light}"/><circle cy="24" r="5" fill="${glow}"/></g>`;
     case 'wolf':
       return `<g ${line}>
       <path d="M51 7Q99 -4 91 -29Q114 -12 101 19Q80 42 45 29" fill="${dark}"/>

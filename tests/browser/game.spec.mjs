@@ -1,4 +1,60 @@
 import { test, expect } from '@playwright/test';
+test('expedition survives reload, gathers resources, unlocks a component and supports a specialist build', async ({
+  page,
+}) => {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.clock.install();
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Spider Legs' }).click();
+  await page.getByRole('button', { name: 'Manufacture creature' }).click();
+  await page.getByRole('button', { name: 'Skip sequence' }).click();
+  await page.getByRole('button', { name: 'Keep experimenting' }).click();
+  await page.getByRole('link', { name: 'Explore', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Expedition creature' }).selectOption('creature-1');
+  await page.getByRole('button', { name: 'Send on expedition' }).click();
+  await expect(page.getByRole('button', { name: 'Collect expedition' })).toBeDisabled();
+  await page.clock.runFor(5000);
+  const before = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('monster-workshop.save')).data.expeditions[0],
+  );
+  expect(before.elapsedMs).toBeGreaterThanOrEqual(4000);
+  await page.clock.setSystemTime(new Date('2099-01-01T00:00:00Z'));
+  await page.reload();
+  const after = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('monster-workshop.save')).data.expeditions[0],
+  );
+  expect(after.elapsedMs).toBe(before.elapsedMs);
+  await page.clock.runFor(17000);
+  await expect(page.getByRole('button', { name: 'Collect expedition' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Collect expedition' }).click();
+  await expect(page.getByRole('status')).toContainText('Herbal Organ');
+  await expect(page.getByRole('button', { name: 'Collect expedition' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Crystal Caves' }).click();
+  await page.getByRole('combobox', { name: 'Expedition creature' }).selectOption('creature-1');
+  await page.getByRole('button', { name: 'Send on expedition' }).click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: `artifacts/exploration-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+  await page.getByRole('button', { name: 'Recall creature' }).click();
+  await page.getByRole('link', { name: 'Workshop', exact: true }).click();
+  await page.getByRole('button', { name: 'Lightning Organ' }).click();
+  await page.getByRole('button', { name: 'Herbal Organ' }).click();
+  await expect(page.locator('.part.selected[data-part="lightning-organ"]')).toHaveCount(0);
+  await expect(page.locator('[data-slot="organ"]')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Manufacture creature' }).click();
+  await page.getByRole('button', { name: 'Skip sequence' }).click();
+  await page.getByRole('button', { name: 'Meet your creature' }).click();
+  const state = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('monster-workshop.save')).data,
+  );
+  expect(state.creatures[1].componentIds).toContain('herbal-organ');
+  expect(state.resources.fiber).toBeGreaterThanOrEqual(3);
+  expect(state.expeditionReports).toHaveLength(2);
+  expect(errors).toEqual([]);
+});
 test('game shell loads content with no runtime errors', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -15,7 +71,7 @@ test('modular preview changes anatomy immediately without horizontal overflow', 
   await expect(page.locator('[data-slot="legs"]')).toBeVisible();
   await page.getByRole('button', { name: 'Spider Legs' }).click();
   await expect(page.locator('[data-slot="legs"]')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Unknown component' })).toBeDisabled();
+  await expect(page.locator('[data-part="storm-wings"]')).toBeDisabled();
   await page.getByRole('button', { name: 'Lightning Organ' }).click();
   await expect(page.locator('[data-slot="organ"]')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

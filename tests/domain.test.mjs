@@ -31,7 +31,7 @@ export function source() {
   };
 }
 test('catalog covers components, genes, traits, abilities and mutations', () => {
-  assert.equal(content.components.size, 6);
+  assert.equal(content.components.size, 9);
   assert.equal(content.mutations.size, 1);
   assert.equal(content.ability('strike').cost, 0);
   assert.throws(() => content.component('missing'));

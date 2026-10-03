@@ -8,8 +8,15 @@
       "category": "anatomical",
       "rarity": "common",
       "element": "fire",
-      "stats": { "attack": 8, "power": 5 },
-      "genes": { "strength": 18, "intelligence": 12, "element": 16 },
+      "stats": {
+        "attack": 8,
+        "power": 5
+      },
+      "genes": {
+        "strength": 18,
+        "intelligence": 12,
+        "element": 16
+      },
       "abilities": ["ember-breath"],
       "traits": ["draconic"],
       "tags": ["dragon", "reptile", "predator"],
@@ -40,8 +47,18 @@
       "category": "anatomical",
       "rarity": "common",
       "element": "neutral",
-      "stats": { "hp": 50, "attack": 8, "defense": 4, "speed": 7, "energy": 10 },
-      "genes": { "vitality": 20, "speed": 14, "adaptation": 12 },
+      "stats": {
+        "hp": 50,
+        "attack": 8,
+        "defense": 4,
+        "speed": 7,
+        "energy": 10
+      },
+      "genes": {
+        "vitality": 20,
+        "speed": 14,
+        "adaptation": 12
+      },
       "abilities": ["mend"],
       "traits": ["resilient"],
       "tags": ["mammal", "wolf", "predator"],
@@ -72,8 +89,14 @@
       "category": "mobility",
       "rarity": "common",
       "element": "poison",
-      "stats": { "speed": 10, "attack": 4 },
-      "genes": { "speed": 18, "mutation": 12 },
+      "stats": {
+        "speed": 10,
+        "attack": 4
+      },
+      "genes": {
+        "speed": 18,
+        "mutation": 12
+      },
       "abilities": ["web-trap"],
       "traits": ["nimble"],
       "tags": ["insect", "arachnid", "climber"],
@@ -104,8 +127,15 @@
       "category": "elemental",
       "rarity": "uncommon",
       "element": "lightning",
-      "stats": { "power": 18, "energy": 8 },
-      "genes": { "element": 28, "intelligence": 10, "mutation": 14 },
+      "stats": {
+        "power": 18,
+        "energy": 8
+      },
+      "genes": {
+        "element": 28,
+        "intelligence": 10,
+        "mutation": 14
+      },
       "abilities": ["thunder-pulse"],
       "traits": ["conductive"],
       "tags": ["electric", "elemental", "experimental"],
@@ -136,8 +166,15 @@
       "category": "defensive",
       "rarity": "uncommon",
       "element": "crystal",
-      "stats": { "hp": 12, "defense": 16, "speed": -3 },
-      "genes": { "stability": 20, "vitality": 12 },
+      "stats": {
+        "hp": 12,
+        "defense": 16,
+        "speed": -3
+      },
+      "genes": {
+        "stability": 20,
+        "vitality": 12
+      },
       "abilities": ["crystal-guard"],
       "traits": ["armored"],
       "tags": ["crystal", "mineral", "defender"],
@@ -168,8 +205,14 @@
       "category": "mobility",
       "rarity": "rare",
       "element": "air",
-      "stats": { "speed": 9, "power": 6 },
-      "genes": { "speed": 14, "adaptation": 18 },
+      "stats": {
+        "speed": 9,
+        "power": 6
+      },
+      "genes": {
+        "speed": 14,
+        "adaptation": 18
+      },
       "abilities": ["gust"],
       "traits": ["stormborne"],
       "tags": ["avian", "flyer", "electric"],
@@ -192,6 +235,128 @@
       },
       "lore": "Recovered from the simulator's storm archive. What if you added wings?",
       "discovery": "battle"
+    },
+    {
+      "id": "herbal-organ",
+      "name": "Herbal Organ",
+      "slot": "organ",
+      "category": "Botanical",
+      "rarity": "uncommon",
+      "element": "nature",
+      "stats": {
+        "hp": 12,
+        "power": 8,
+        "energy": 12
+      },
+      "genes": {
+        "adaptation": 25,
+        "vitality": 10,
+        "stability": 10
+      },
+      "abilities": ["mend"],
+      "traits": ["resilient"],
+      "tags": ["plant", "herbal", "gatherer"],
+      "compatibleTags": ["mammal", "mineral"],
+      "conflictTags": [],
+      "energyCost": 3,
+      "weight": 1,
+      "size": 1,
+      "mutationChance": 0.01,
+      "visual": {
+        "mesh": "herbal",
+        "anchor": "organ",
+        "scale": 1,
+        "allowedScale": [0.8, 1.2],
+        "rotation": 0,
+        "allowedRotation": [-5, 5],
+        "layer": 6,
+        "color": "#8ebd73",
+        "inheritColor": 0.15
+      },
+      "lore": "A living herb garden that turns meadow forage into restorative energy.",
+      "discovery": "expedition"
+    },
+    {
+      "id": "crystal-body",
+      "name": "Crystal Chassis",
+      "slot": "body",
+      "category": "Mineral",
+      "rarity": "rare",
+      "element": "crystal",
+      "stats": {
+        "hp": 40,
+        "attack": 6,
+        "defense": 17,
+        "speed": 3,
+        "power": 8,
+        "energy": 12
+      },
+      "genes": {
+        "vitality": 15,
+        "adaptation": 18,
+        "strength": 8
+      },
+      "abilities": ["crystal-guard"],
+      "traits": ["armored"],
+      "tags": ["mineral", "crystal", "miner", "defender"],
+      "compatibleTags": ["crystal", "herbal", "elemental"],
+      "conflictTags": [],
+      "energyCost": 5,
+      "weight": 4,
+      "size": 1,
+      "mutationChance": 0.02,
+      "visual": {
+        "mesh": "crystal-beast",
+        "anchor": "body",
+        "scale": 1,
+        "allowedScale": [0.85, 1.15],
+        "rotation": 0,
+        "allowedRotation": [0, 0],
+        "layer": 2,
+        "color": "#a58ecf",
+        "inheritColor": 0.2
+      },
+      "lore": "Faceted shoulders shelter a patient mineral creature built for deep cave surveys.",
+      "discovery": "expedition"
+    },
+    {
+      "id": "gale-wings",
+      "name": "Gale Wings",
+      "slot": "wings",
+      "category": "mobility",
+      "rarity": "rare",
+      "element": "air",
+      "stats": {
+        "speed": 15,
+        "power": 4,
+        "energy": 7
+      },
+      "genes": {
+        "speed": 18,
+        "adaptation": 25
+      },
+      "abilities": ["gust"],
+      "traits": ["stormborne"],
+      "tags": ["avian", "flyer", "scout"],
+      "compatibleTags": ["flyer", "electric", "plant"],
+      "conflictTags": [],
+      "energyCost": 4,
+      "weight": 2,
+      "size": 1,
+      "mutationChance": 0.02,
+      "visual": {
+        "mesh": "storm",
+        "anchor": "wings",
+        "scale": 1,
+        "allowedScale": [0.9, 1.2],
+        "rotation": 0,
+        "allowedRotation": [-8, 8],
+        "layer": 0,
+        "color": "#93dbc7",
+        "inheritColor": 0.1
+      },
+      "lore": "Light membrane sails catch the shifting currents above Storm Valley.",
+      "discovery": "expedition"
     }
   ],
   "traits": [
@@ -199,49 +364,63 @@
       "id": "draconic",
       "name": "Draconic",
       "description": "An adaptable elemental frame.",
-      "stats": { "power": 3 },
+      "stats": {
+        "power": 3
+      },
       "tags": ["mage"]
     },
     {
       "id": "resilient",
       "name": "Resilient",
       "description": "Built to bounce back.",
-      "stats": { "hp": 8 },
+      "stats": {
+        "hp": 8
+      },
       "tags": ["bruiser"]
     },
     {
       "id": "nimble",
       "name": "Nimble",
       "description": "Six more reasons to move quickly.",
-      "stats": { "speed": 3 },
+      "stats": {
+        "speed": 3
+      },
       "tags": ["speedster"]
     },
     {
       "id": "conductive",
       "name": "Conductive",
       "description": "Channels lightning efficiently.",
-      "stats": { "power": 4 },
+      "stats": {
+        "power": 4
+      },
       "tags": ["mage"]
     },
     {
       "id": "armored",
       "name": "Armored",
       "description": "A lattice that absorbs impacts.",
-      "stats": { "defense": 4 },
+      "stats": {
+        "defense": 4
+      },
       "tags": ["tank"]
     },
     {
       "id": "stormborne",
       "name": "Stormborne",
       "description": "Made for the open sky.",
-      "stats": { "speed": 3 },
+      "stats": {
+        "speed": 3
+      },
       "tags": ["explorer"]
     },
     {
       "id": "overcharged",
       "name": "Overcharged",
       "description": "Wild energy flows through extra crystal growths.",
-      "stats": { "power": 6 },
+      "stats": {
+        "power": 6
+      },
       "tags": ["mage", "mutant"]
     }
   ],
@@ -254,7 +433,14 @@
       "cost": 0,
       "cooldown": 0,
       "target": "enemy",
-      "effects": [{ "type": "damage", "power": 1, "scaling": "attack", "element": "neutral" }]
+      "effects": [
+        {
+          "type": "damage",
+          "power": 1,
+          "scaling": "attack",
+          "element": "neutral"
+        }
+      ]
     },
     {
       "id": "ember-breath",
@@ -265,8 +451,19 @@
       "cooldown": 1,
       "target": "enemy",
       "effects": [
-        { "type": "damage", "power": 1.1, "scaling": "power", "element": "fire" },
-        { "type": "status", "status": "burn", "duration": 2, "chance": 0.65, "potency": 5 }
+        {
+          "type": "damage",
+          "power": 1.1,
+          "scaling": "power",
+          "element": "fire"
+        },
+        {
+          "type": "status",
+          "status": "burn",
+          "duration": 2,
+          "chance": 0.65,
+          "potency": 5
+        }
       ]
     },
     {
@@ -277,7 +474,12 @@
       "cost": 5,
       "cooldown": 2,
       "target": "ally",
-      "effects": [{ "type": "heal", "power": 25 }]
+      "effects": [
+        {
+          "type": "heal",
+          "power": 25
+        }
+      ]
     },
     {
       "id": "web-trap",
@@ -288,8 +490,19 @@
       "cooldown": 1,
       "target": "enemy",
       "effects": [
-        { "type": "damage", "power": 0.85, "scaling": "attack", "element": "poison" },
-        { "type": "status", "status": "slow", "duration": 2, "chance": 1, "potency": 0.35 }
+        {
+          "type": "damage",
+          "power": 0.85,
+          "scaling": "attack",
+          "element": "poison"
+        },
+        {
+          "type": "status",
+          "status": "slow",
+          "duration": 2,
+          "chance": 1,
+          "potency": 0.35
+        }
       ]
     },
     {
@@ -301,8 +514,19 @@
       "cooldown": 2,
       "target": "enemy",
       "effects": [
-        { "type": "damage", "power": 1.4, "scaling": "power", "element": "lightning" },
-        { "type": "status", "status": "shock", "duration": 2, "chance": 0.8, "potency": 0.25 }
+        {
+          "type": "damage",
+          "power": 1.4,
+          "scaling": "power",
+          "element": "lightning"
+        },
+        {
+          "type": "status",
+          "status": "shock",
+          "duration": 2,
+          "chance": 0.8,
+          "potency": 0.25
+        }
       ]
     },
     {
@@ -313,7 +537,12 @@
       "cost": 4,
       "cooldown": 2,
       "target": "self",
-      "effects": [{ "type": "shield", "power": 24 }]
+      "effects": [
+        {
+          "type": "shield",
+          "power": 24
+        }
+      ]
     },
     {
       "id": "gust",
@@ -324,8 +553,19 @@
       "cooldown": 1,
       "target": "enemy",
       "effects": [
-        { "type": "damage", "power": 1.15, "scaling": "power", "element": "air" },
-        { "type": "status", "status": "weakness", "duration": 2, "chance": 0.7, "potency": 0.2 }
+        {
+          "type": "damage",
+          "power": 1.15,
+          "scaling": "power",
+          "element": "air"
+        },
+        {
+          "type": "status",
+          "status": "weakness",
+          "duration": 2,
+          "chance": 0.7,
+          "potency": 0.2
+        }
       ]
     }
   ],
@@ -337,8 +577,14 @@
       "requiredTags": ["electric"],
       "excludedTags": [],
       "chance": 0.16,
-      "stats": { "power": 10, "defense": 3 },
-      "genes": { "mutation": 15, "stability": -12 },
+      "stats": {
+        "power": 10,
+        "defense": 3
+      },
+      "genes": {
+        "mutation": 15,
+        "stability": -12
+      },
       "abilities": ["thunder-pulse"],
       "traits": ["overcharged"],
       "feature": "electric-spines"
@@ -363,10 +609,29 @@
       "qualityCompatibilityWeight": 0.65,
       "perLevelGrowth": 0.02,
       "abilityPriority": ["organ", "armor", "legs", "head", "wings", "body"],
-      "baseStats": { "hp": 35, "attack": 10, "defense": 3, "speed": 8, "power": 9, "energy": 10 },
+      "baseStats": {
+        "hp": 35,
+        "attack": 10,
+        "defense": 3,
+        "speed": 8,
+        "power": 9,
+        "energy": 10
+      },
       "qualityBands": [
-        { "quality": "poor", "minimum": 0, "abilitySlots": 3, "traitSlots": 2, "growth": 0.8 },
-        { "quality": "common", "minimum": 40, "abilitySlots": 4, "traitSlots": 3, "growth": 1 },
+        {
+          "quality": "poor",
+          "minimum": 0,
+          "abilitySlots": 3,
+          "traitSlots": 2,
+          "growth": 0.8
+        },
+        {
+          "quality": "common",
+          "minimum": 40,
+          "abilitySlots": 4,
+          "traitSlots": 3,
+          "growth": 1
+        },
         {
           "quality": "uncommon",
           "minimum": 55,
@@ -374,8 +639,20 @@
           "traitSlots": 4,
           "growth": 1.05
         },
-        { "quality": "rare", "minimum": 70, "abilitySlots": 5, "traitSlots": 5, "growth": 1.1 },
-        { "quality": "superior", "minimum": 85, "abilitySlots": 6, "traitSlots": 6, "growth": 1.15 }
+        {
+          "quality": "rare",
+          "minimum": 70,
+          "abilitySlots": 5,
+          "traitSlots": 5,
+          "growth": 1.1
+        },
+        {
+          "quality": "superior",
+          "minimum": 85,
+          "abilitySlots": 6,
+          "traitSlots": 6,
+          "growth": 1.15
+        }
       ],
       "elementColors": {
         "neutral": "#c5b8ec",
@@ -405,9 +682,19 @@
         "shadow": "Shade",
         "crystal": "Prism"
       },
-      "nameSuffixTags": { "arachnid": "weaver", "flyer": "wing", "wolf": "fang", "dragon": "drake" }
+      "nameSuffixTags": {
+        "arachnid": "weaver",
+        "flyer": "wing",
+        "wolf": "fang",
+        "dragon": "drake"
+      }
     },
-    "workshop": { "startingBiomass": 120, "starterQuantity": 5, "baseCost": 6, "maxCreatures": 60 },
+    "workshop": {
+      "startingBiomass": 120,
+      "starterQuantity": 5,
+      "baseCost": 6,
+      "maxCreatures": 60
+    },
     "combat": {
       "armorFactor": 0.045,
       "criticalChance": 0.1,
@@ -422,13 +709,33 @@
       "experience": 20,
       "experiencePerLevel": 100,
       "resistances": [
-        { "attack": "lightning", "defense": "earth", "multiplier": 0.75 },
-        { "attack": "fire", "defense": "crystal", "multiplier": 0.8 },
-        { "attack": "poison", "defense": "fire", "multiplier": 1.2 },
-        { "attack": "air", "defense": "poison", "multiplier": 1.2 }
+        {
+          "attack": "lightning",
+          "defense": "earth",
+          "multiplier": 0.75
+        },
+        {
+          "attack": "fire",
+          "defense": "crystal",
+          "multiplier": 0.8
+        },
+        {
+          "attack": "poison",
+          "defense": "fire",
+          "multiplier": 1.2
+        },
+        {
+          "attack": "air",
+          "defense": "poison",
+          "multiplier": 1.2
+        }
       ],
       "opponents": [
-        { "name": "Cinder Prototype", "components": ["dragon-head", "wolf-body"], "seed": 101 },
+        {
+          "name": "Cinder Prototype",
+          "components": ["dragon-head", "wolf-body"],
+          "seed": 101
+        },
         {
           "name": "Static Prototype",
           "components": ["dragon-head", "wolf-body", "lightning-organ"],
@@ -440,6 +747,88 @@
           "seed": 303
         }
       ]
+    },
+    "exploration": {
+      "maxAssignments": 3,
+      "affinityWeight": 0.6,
+      "adaptationWeight": 0.25,
+      "speedWeight": 0.15,
+      "yieldBonus": 1,
+      "discoveryBonus": 0.3,
+      "restockQuantity": 2,
+      "experience": 10
     }
-  }
+  },
+  "resources": [
+    {
+      "id": "fiber",
+      "name": "Botanical Fiber",
+      "description": "Gathered in Green Meadow. Used for anatomy and scanner research."
+    },
+    {
+      "id": "crystal",
+      "name": "Cave Crystal",
+      "description": "Mined in Crystal Caves. Used for elemental and mutation research."
+    },
+    {
+      "id": "storm-essence",
+      "name": "Storm Essence",
+      "description": "Recovered in Storm Valley. Used for advanced biological research."
+    }
+  ],
+  "regions": [
+    {
+      "id": "green-meadow",
+      "name": "Green Meadow",
+      "description": "Soft grass, stubborn herbs, and curious tracks. Every invention can begin here.",
+      "activity": "Gathering",
+      "durationMs": 20000,
+      "prerequisites": [],
+      "requiredTags": [],
+      "minimumStats": {},
+      "affinityTags": ["herbal", "gatherer", "plant"],
+      "biomass": 16,
+      "resource": "fiber",
+      "quantity": 3,
+      "restock": ["dragon-head", "wolf-body"],
+      "discovery": "herbal-organ",
+      "discoveryChance": 0.3
+    },
+    {
+      "id": "crystal-caves",
+      "name": "Crystal Caves",
+      "description": "Narrow ledges lead to luminous mineral seams. A climber or mineral chassis can reach them.",
+      "activity": "Mining",
+      "durationMs": 40000,
+      "prerequisites": ["green-meadow"],
+      "requiredTags": ["climber", "mineral"],
+      "minimumStats": {},
+      "affinityTags": ["miner", "mineral", "crystal"],
+      "biomass": 20,
+      "resource": "crystal",
+      "quantity": 3,
+      "restock": ["spider-legs", "crystal-armor"],
+      "discovery": "crystal-body",
+      "discoveryChance": 0.3
+    },
+    {
+      "id": "storm-valley",
+      "name": "Storm Valley",
+      "description": "Ride the rising winds to collect charged pollen. Only a flying creature can cross the gorge.",
+      "activity": "Scouting",
+      "durationMs": 60000,
+      "prerequisites": ["crystal-caves"],
+      "requiredTags": ["flyer"],
+      "minimumStats": {
+        "energy": 12
+      },
+      "affinityTags": ["scout", "flyer", "electric"],
+      "biomass": 25,
+      "resource": "storm-essence",
+      "quantity": 3,
+      "restock": ["lightning-organ", "storm-wings"],
+      "discovery": "gale-wings",
+      "discoveryChance": 0.3
+    }
+  ]
 }

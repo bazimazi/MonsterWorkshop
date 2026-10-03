@@ -36,4 +36,12 @@ Implemented pure 3v3 turn resolution, data-defined actions/AI, armor/resistance/
 
 Validation: 40 unit tests plus 16 desktop/mobile browser scenarios pass, including the full three-creature manufacture → combat → reload → reward → new component → fourth manufacture loop, shield targeting, offline manufacture and actual exported-file reimport. The property sweep covers 1,920 creations; mutation testing covers 4,000 rolls; combat tests cover 100 seeded deterministic battles and developer simulations cover another 1,000 battles. Economy simulations cover six profiles at 1/7/30/90 days. Screenshots were inspected. [Milestone review](review.md) records the findings and limits; [playtest guide](playtest.md) makes the result reviewable.
 
-Phases 0–5 are complete and separately committed. Phases 6–12 are explicitly deferred under specification sections 117/120 until core-loop playtesting; no later-phase placeholder systems were shipped.
+## Phase 6 - Exploration
+
+Implemented Green Meadow gathering, Crystal Caves mining and Storm Valley scouting as data-defined regions. Region prerequisites, anatomy tags and minimum stats determine eligibility; affinity tags, adaptation genes and speed determine yields. Each region guarantees its first component discovery, then uses deterministic seeded drop chances. Herbal Organ, Crystal Chassis and Gale Wings are usable alternatives with original anchored visuals. Resource storage, starter restocking, experience, safe recall, assignment exclusion and immutable reward reports close the exploration/manufacturing loop.
+
+Progress uses bounded foreground monotonic intervals and is persisted transactionally. Hidden or closed games pause; wall-clock jumps and timestamps cannot generate elapsed rewards. Earlier schema-1 saves migrate empty expedition fields without changing genomes or experiment records. Local save editing remains possible, as with all single-player persistence.
+
+Validation: 50 unit tests and 18 desktop/mobile browser scenarios pass. Coverage includes the route through all three regions from a fresh workshop, specialist yield, unmet requirements, battle/expedition exclusion, exact resume, wall-clock changes, unique claims, forged snapshots, failed-write rollback and real UI discovery/manufacturing with same-slot replacement. Both expedition screenshots were visually inspected; phone navigation and content stay within the viewport.
+
+Phases 0 through 6 are complete and separately committed. The user requested continuation after the first slice; research is next. Breeding retains its explicit playtest gate under specification section 106.

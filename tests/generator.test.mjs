@@ -15,7 +15,9 @@ const content = new ContentIndex(
 );
 const options = { seed: 1742, createdAt: '2026-10-02T00:00:00.000Z', creator: 'Engineer' };
 const base = ['dragon-head', 'wolf-body'];
-const all = content.catalog.components.map((p) => p.id);
+const all = content.catalog.components
+  .filter((p) => ['starter', 'battle'].includes(p.discovery))
+  .map((p) => p.id);
 test('same normalized anatomy and seed yields identical creature', () => {
   const c = generateCreature(all, content, options);
   assert.deepEqual(c, generateCreature([...all].reverse(), content, options));

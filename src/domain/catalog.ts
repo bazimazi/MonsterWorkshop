@@ -1,5 +1,5 @@
 import { ELEMENTS, GENES, QUALITY, SLOTS, STAT_KEYS, STATUS_IDS } from './model.js';
-import type { Catalog, Component, Ability, Trait, Mutation } from './model.js';
+import type { Catalog, Component, Ability, Trait, Mutation, Resource, Region } from './model.js';
 import {
   DomainError,
   list,
@@ -81,7 +81,7 @@ export function decodeCatalog(raw: unknown): Catalog {
     member(p.slot, SLOTS, 'slot');
     member(p.rarity, ['common', 'uncommon', 'rare', 'epic', 'legendary'], 'rarity');
     member(p.element, ELEMENTS, 'element');
-    member(p.discovery, ['starter', 'battle'], 'discovery');
+    member(p.discovery, ['starter', 'battle', 'expedition', 'research'], 'discovery');
     modifiers(p.stats, STAT_KEYS, 'component stats');
     modifiers(p.genes, GENES, 'component genes');
     references(p.abilities, abilityIds, 'ability');
@@ -212,18 +212,82 @@ export function decodeCatalog(raw: unknown): Catalog {
     references(o.components, componentIds, 'opponent component');
     number(o.seed, 'opponent seed', 0, 0xffffffff, true);
   }
+  const resources = table(c.resources, 'resources'),
+    regions = table(c.regions, 'regions');
+  const resourceIds = new Set(resources.map((r) => r.id as string));
+  const regionIds = new Set(regions.map((r) => r.id as string));
+  for (const r of resources) {
+    string(r.name, 'resource name');
+    string(r.description, 'resource description');
+  }
+  for (const r of regions) {
+    for (const key of ['name', 'description', 'activity']) string(r[key], key);
+    number(r.durationMs, 'expedition duration', 1000, 3600000, true);
+    references(r.prerequisites, regionIds, 'region prerequisite');
+    strings(r.requiredTags, 'required tags');
+    strings(r.affinityTags, 'affinity tags');
+    modifiers(r.minimumStats, STAT_KEYS, 'minimum stats');
+    for (const value of Object.values(r.minimumStats as Record<string, number>))
+      number(value, 'minimum stat', 0, 1000);
+    number(r.biomass, 'gathered biomass', 1, 1000, true);
+    number(r.quantity, 'resource quantity', 1, 100, true);
+    number(r.discoveryChance, 'discovery chance', 0, 1);
+    references([r.resource], resourceIds, 'resource');
+    references(r.restock, componentIds, 'restock component');
+    references([r.discovery], componentIds, 'expedition discovery');
+    if (components.find((p) => p.id === r.discovery)?.discovery !== 'expedition')
+      throw new DomainError('Region discoveries require expedition components');
+  }
+  validateTree(regions, 'region');
+  const x = record(rules.exploration, 'exploration rules');
+  number(x.maxAssignments, 'expedition capacity', 1, 6, true);
+  for (const key of [
+    'affinityWeight',
+    'adaptationWeight',
+    'speedWeight',
+    'yieldBonus',
+    'discoveryBonus',
+  ])
+    number(x[key], key, 0, 1);
+  if (
+    Math.abs(
+      (x.affinityWeight as number) + (x.adaptationWeight as number) + (x.speedWeight as number) - 1,
+    ) > 0.00001
+  )
+    throw new DomainError('Expedition fitness weights must sum to one');
+  number(x.restockQuantity, 'restock quantity', 1, 100, true);
+  number(x.experience, 'expedition experience', 1, 1000, true);
   return structuredClone(c) as unknown as Catalog;
+}
+export function validateTree(entries: Record<string, unknown>[], label: string): void {
+  const visiting = new Set<string>(),
+    visited = new Set<string>();
+  const visit = (id: string): void => {
+    if (visiting.has(id)) throw new DomainError(`Cyclic ${label} prerequisites`);
+    if (visited.has(id)) return;
+    visiting.add(id);
+    const entry = entries.find((e) => e.id === id);
+    if (!entry) throw new DomainError(`Missing ${label} prerequisite: ${id}`);
+    for (const parent of entry.prerequisites as string[]) visit(parent);
+    visiting.delete(id);
+    visited.add(id);
+  };
+  for (const entry of entries) visit(entry.id as string);
 }
 export class ContentIndex {
   readonly components: Map<string, Component>;
   readonly abilities: Map<string, Ability>;
   readonly traits: Map<string, Trait>;
   readonly mutations: Map<string, Mutation>;
+  readonly resources: Map<string, Resource>;
+  readonly regions: Map<string, Region>;
   constructor(readonly catalog: Catalog) {
     this.components = new Map(catalog.components.map((v) => [v.id, v]));
     this.abilities = new Map(catalog.abilities.map((v) => [v.id, v]));
     this.traits = new Map(catalog.traits.map((v) => [v.id, v]));
     this.mutations = new Map(catalog.mutations.map((v) => [v.id, v]));
+    this.resources = new Map(catalog.resources.map((v) => [v.id, v]));
+    this.regions = new Map(catalog.regions.map((v) => [v.id, v]));
   }
   component(id: string): Component {
     const value = this.components.get(id);
@@ -233,6 +297,11 @@ export class ContentIndex {
   ability(id: string): Ability {
     const value = this.abilities.get(id);
     if (!value) throw new DomainError(`Unknown ability: ${id}`);
+    return value;
+  }
+  region(id: string): Region {
+    const value = this.regions.get(id);
+    if (!value) throw new DomainError(`Unknown region: ${id}`);
     return value;
   }
 }
