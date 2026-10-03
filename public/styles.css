@@ -51,6 +51,21 @@ a {
   outline: 3px solid var(--mint);
   outline-offset: 4px;
 }
+.skip-link {
+  position: fixed;
+  z-index: 200;
+  top: 12px;
+  left: 12px;
+  max-width: calc(100% - 24px);
+  padding: 14px 20px;
+  color: var(--bg);
+  background: var(--mint);
+  border-radius: 10px;
+  transform: translateY(calc(-100% - 24px));
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
 .shell {
   max-width: 1200px;
   margin: auto;

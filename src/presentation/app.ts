@@ -22,6 +22,8 @@ import { explorationView } from './exploration.js';
 import { describeCost, researchView } from './research.js';
 import { costRequirements, hasResearch, mutationConditions } from '../domain/research.js';
 import { currentEvent } from '../domain/events.js';
+import { captureFocus, containTabFocus, restoreFocus } from './focus.js';
+import type { FocusBookmark } from './focus.js';
 import type { BattleReward } from '../application/workshop.js';
 export function downloadSave(raw: string, filename = 'monster-workshop-save.json'): void {
   const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' })),
@@ -68,6 +70,8 @@ export class GameUI {
   private lastTick = performance.now();
   private clockFailed = false;
   private calendarKey: string | null = null;
+  private renderedScreen: Screen | undefined;
+  private dialogReturnFocus: FocusBookmark | undefined;
   private socialCreature: string | undefined;
   private marketOffer: string | undefined;
   private marketRecipe: string | undefined;
@@ -90,7 +94,10 @@ export class GameUI {
     });
     root.addEventListener('click', (event) => {
       const button = (event.target as HTMLElement).closest<HTMLElement>('[data-action]');
-      if (button) void this.act(button.dataset.action!, button).catch((error) => this.fail(error));
+      if (button) {
+        if (button instanceof HTMLAnchorElement) event.preventDefault();
+        void this.act(button.dataset.action!, button).catch((error) => this.fail(error));
+      }
     });
     root.addEventListener('submit', (event) => {
       const form = event.target as HTMLFormElement;
@@ -219,6 +226,7 @@ export class GameUI {
     this.sequence = undefined;
     this.revealId = undefined;
     this.timer = undefined;
+    this.dialogReturnFocus = undefined;
     this.inspectedId = undefined;
     this.filter = 'all';
     this.explorerId = undefined;
@@ -264,11 +272,20 @@ export class GameUI {
     this.feedback.haptics = state.options.haptics;
   }
   private render(focusPart?: string): void {
+    const focus = captureFocus(this.root),
+      previousDialog = this.root.querySelector('dialog'),
+      sameScreen = this.renderedScreen === this.nav.current,
+      disclosures = new Map(
+        Array.from(this.root.querySelectorAll<HTMLDetailsElement>('details[data-detail]')).map(
+          (details) => [details.dataset.detail!, details.open] as const,
+        ),
+      );
     const state = this.workshop.state;
     this.applyOptions(state);
     if (!hasResearch(state.completedResearch, 'mutation-control', this.content))
       this.controlledMutation = undefined;
     const screen = this.nav.current;
+    this.renderedScreen = screen;
     this.calendarKey = currentEvent(new Date().toISOString(), this.content)?.key ?? null;
     if (!state.activeBattle && (screen === 'battle' || screen === 'challenges'))
       this.prepareSquad();
@@ -321,14 +338,29 @@ export class GameUI {
       ['research', 'Research', '⌕'],
       ['explore', 'Explore', '❧'],
     ];
-    this.root.innerHTML = `<header class="topbar"><a class="brand" href="#workshop"><img src="./icon.svg" alt="" width="36" height="36"><span>MONSTER<span class="brand-light">WORKSHOP</span></span></a><div class="resource"><span class="resource-dot" aria-hidden="true"></span><strong>${state.biomass}</strong><span>biomass</span></div><div class="utility-links"><a class="utility-link" href="#market" aria-label="Marketplace">&#9878;</a><a class="utility-link" href="#journal" aria-label="Journal">&#8801;</a><a class="utility-link" href="#settings" aria-label="Settings">&#9881;</a></div></header><nav class="navigation" aria-label="Main navigation">${tabs.map(([key, label, symbol]) => `<a href="#${key}" ${screen === key ? 'aria-current="page"' : ''}><span aria-hidden="true">${symbol}</span>${label}${key === 'creatures' ? `<small aria-hidden="true">${this.workshop.creatures.length}</small>` : ''}</a>`).join('')}</nav><main class="shell game-shell">${this.notice ? `<div class="notice ${this.isError ? 'error' : ''}" role="${this.isError ? 'alert' : 'status'}">${escape(this.notice)}<button class="quiet" data-action="dismiss" aria-label="Dismiss message">×</button></div>` : ''}${this.clockFailed ? '<section class="notice clock-recovery" role="status"><p>Expeditions and parent recovery are paused until this browser can save.</p><button class="secondary" data-action="retry-clock">Resume active timers</button></section>' : ''}${body}</main><footer class="footer">A little science. A little strange. <span>Saved on this device</span></footer>${this.modal()}`;
+    this.root.innerHTML = `<a class="skip-link" href="#main-content" data-action="skip-content">Skip to content</a><header class="topbar"><a class="brand" href="#workshop"><img src="./icon.svg" alt="" width="36" height="36"><span>MONSTER<span class="brand-light">WORKSHOP</span></span></a><div class="resource"><span class="resource-dot" aria-hidden="true"></span><strong>${state.biomass}</strong><span>biomass</span></div><div class="utility-links"><a class="utility-link" href="#market" aria-label="Marketplace">&#9878;</a><a class="utility-link" href="#journal" aria-label="Journal">&#8801;</a><a class="utility-link" href="#settings" aria-label="Settings">&#9881;</a></div></header><nav class="navigation" aria-label="Main navigation">${tabs.map(([key, label, symbol]) => `<a href="#${key}" ${screen === key ? 'aria-current="page"' : ''}><span aria-hidden="true">${symbol}</span>${label}${key === 'creatures' ? `<small aria-hidden="true">${this.workshop.creatures.length}</small>` : ''}</a>`).join('')}</nav><main class="shell game-shell" id="main-content">${this.notice ? `<div class="notice ${this.isError ? 'error' : ''}" role="${this.isError ? 'alert' : 'status'}">${escape(this.notice)}<button class="quiet" data-action="dismiss" aria-label="Dismiss message">×</button></div>` : ''}${this.clockFailed ? '<section class="notice clock-recovery" role="status"><p>Expeditions and parent recovery are paused until this browser can save.</p><button class="secondary" data-action="retry-clock">Resume active timers</button></section>' : ''}${body}</main><footer class="footer">A little science. A little strange. <span>Saved on this device</span></footer>${this.modal()}`;
     const dialog = this.root.querySelector<HTMLDialogElement>('dialog');
+    if (sameScreen)
+      for (const details of this.root.querySelectorAll<HTMLDetailsElement>(
+        'details[data-detail]',
+      )) {
+        const open = disclosures.get(details.dataset.detail!);
+        if (open !== undefined) details.open = open;
+      }
     if (dialog) {
+      if (!previousDialog) this.dialogReturnFocus = focus;
       dialog.showModal();
+      dialog.addEventListener('keydown', (event) => containTabFocus(dialog, event));
       dialog.addEventListener('cancel', (event) => {
         event.preventDefault();
         this.closeReveal();
       });
+      restoreFocus(this.root, focus, dialog);
+    } else if (sameScreen) {
+      const returning = previousDialog ? this.dialogReturnFocus : focus;
+      if (!restoreFocus(this.root, returning) && (returning || previousDialog))
+        this.root.querySelector<HTMLElement>('main h1')?.focus();
+      if (previousDialog) this.dialogReturnFocus = undefined;
     }
     if (focusPart)
       Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-part]'))
@@ -429,7 +461,7 @@ export class GameUI {
       })
       .join(
         '',
-      )}</div><div class="forecast"><div><span>Compatibility</span><strong>${creature ? creature.compatibility.score + '%' : '—'}</strong></div><div class="meter"><span style="width:${creature?.compatibility.score ?? 0}%"></span></div><div><span>${creature?.compatibility.tier ?? 'Incomplete anatomy'}</span><span class="mutation-hint">Mutation potential ${mutationForecast}</span></div></div>${creature?.compatibility.reasons.length ? `<details class="interactions"><summary>Genetic interactions · ${creature.compatibility.reasons.length}</summary><ul>${creature.compatibility.reasons.map((r) => `<li>${escape(r)}</li>`).join('')}</ul></details>` : ''}${controlAvailable ? `<label class="controlled-picker">Mutation guidance<select aria-label="Mutation guidance" data-controlled-mutation="true"><option value="">Natural experiment</option>${state.discoveredMutations.map((id) => `<option value="${id}" ${this.controlledMutation === id ? 'selected' : ''}>${escape(this.content.mutations.get(id)!.name)}</option>`).join('')}</select></label><p class="micro">Guided creation adds ${escape(describeCost(this.content.catalog.rules.research.controlledMutationCost, this.content))}. Required biology still applies.</p>${controlReasons.map((r) => `<p class="micro requirement">${escape(r)}</p>`).join('')}` : ''}<button class="primary manufacture" data-action="manufacture" ${!enough ? 'disabled' : ''}><span>✦ Manufacture creature</span><span>${cost} biomass</span></button>${!enough ? `<p class="micro">${escape(blockedReason)}</p>` : '<p class="micro">Consumes one of each selected part. No two genomes are quite alike.</p>'}</section></div>`;
+      )}</div><div class="forecast"><div><span>Compatibility</span><strong>${creature ? creature.compatibility.score + '%' : '—'}</strong></div><div class="meter"><span style="width:${creature?.compatibility.score ?? 0}%"></span></div><div><span>${creature?.compatibility.tier ?? 'Incomplete anatomy'}</span><span class="mutation-hint">Mutation potential ${mutationForecast}</span></div></div>${creature?.compatibility.reasons.length ? `<details class="interactions" data-detail="interactions"><summary>Genetic interactions · ${creature.compatibility.reasons.length}</summary><ul>${creature.compatibility.reasons.map((r) => `<li>${escape(r)}</li>`).join('')}</ul></details>` : ''}${controlAvailable ? `<label class="controlled-picker">Mutation guidance<select aria-label="Mutation guidance" data-controlled-mutation="true"><option value="">Natural experiment</option>${state.discoveredMutations.map((id) => `<option value="${id}" ${this.controlledMutation === id ? 'selected' : ''}>${escape(this.content.mutations.get(id)!.name)}</option>`).join('')}</select></label><p class="micro">Guided creation adds ${escape(describeCost(this.content.catalog.rules.research.controlledMutationCost, this.content))}. Required biology still applies.</p>${controlReasons.map((r) => `<p class="micro requirement">${escape(r)}</p>`).join('')}` : ''}<button class="primary manufacture" data-action="manufacture" ${!enough ? 'disabled' : ''}><span>✦ Manufacture creature</span><span>${cost} biomass</span></button>${!enough ? `<p class="micro">${escape(blockedReason)}</p>` : '<p class="micro">Consumes one of each selected part. No two genomes are quite alike.</p>'}</section></div>`;
   }
   private creaturesView(_state: PlayerState): string {
     const all = this.workshop.creatures,
@@ -546,7 +578,7 @@ export class GameUI {
               '',
             )}</div><p class="ability-description">${escape(this.content.ability(this.selectedAbility).description)}</p><button class="primary execute-action" data-action="battle-action" ${!this.selectedTarget ? 'disabled' : ''}>Use ${escape(this.content.ability(this.selectedAbility).name)}</button><p class="micro">Target: ${escape(targets.find((u) => u.id === this.selectedTarget)?.source.name ?? 'Choose a target')}</p><button class="quiet retreat" data-action="retreat">Retreat safely</button></section>`
         : `<section class="panel battle-result"><p class="eyebrow">${battle.status === 'victory' ? 'CREATURE ENGINEERING: SUCCESS' : 'A CHANCE TO IMPROVE'}</p><h2>${battle.status === 'victory' ? 'Your designs work.' : 'Every experiment teaches you something.'}</h2><p class="muted">${battle.status === 'victory' ? 'Collect your materials and a new component discovery.' : 'Your creatures recover for another attempt. Try more armor or elemental power.'}</p><button class="primary" data-action="claim-battle">${battle.status === 'victory' ? 'Collect rewards' : 'Return to habitat'}</button></section>`
-    }<details class="panel battle-log" open><summary>Battle log</summary><ol role="log" aria-live="polite">${battle.log
+    }<details class="panel battle-log" data-detail="battle-log" open><summary>Battle log</summary><ol role="log" aria-live="polite">${battle.log
       .slice(-8)
       .map((line) => `<li>${escape(line)}</li>`)
       .join('')}</ol></details></section></div>`;
@@ -567,7 +599,6 @@ export class GameUI {
     this.sequence = undefined;
     this.revealId = undefined;
     this.render();
-    this.root.querySelector<HTMLButtonElement>('[data-action="manufacture"]')?.focus();
   }
   private finishSequence(): void {
     if (this.timer) clearTimeout(this.timer);
@@ -587,6 +618,11 @@ export class GameUI {
     }, 450);
   }
   private async act(action: string, button: HTMLElement): Promise<void> {
+    if (action === 'skip-content') {
+      const heading = this.root.querySelector<HTMLElement>('main h1');
+      heading?.focus();
+      heading?.scrollIntoView({ block: 'start', behavior: this.animated() ? 'smooth' : 'instant' });
+    }
     if (action === 'retry-clock') {
       this.workshop.retrySave();
       this.clockFailed = false;

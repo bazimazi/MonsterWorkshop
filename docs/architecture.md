@@ -177,3 +177,9 @@ Mutations may reference an event ID. Generation and forecasts apply the same win
 ## Final phase coverage
 
 Phases 8-12 add breeding, advanced combat, NPC economy, portable social exchange and rotating seasonal content on the same domain/application/presentation boundaries. All major actions remain transactional, source-driven and locally persisted. The five primary navigation destinations remain stable; breeding, challenges, marketplace, sharing and events are subordinate screens. Follow docs/progress.md for phase evidence and docs/playtest.md for the complete review path.
+
+## Presentation focus lifecycle
+
+The UI rebuilds its HTML on actions, so rendering bookmarks the focused control using its stable data attributes and owning form. Selectors escape imported identifiers; only unique matches restore focus. Text fields retain their selection range. Keyed disclosures preserve expansion within the same screen. This transient presentation state does not enter saves or domain rules.
+
+Modal rendering limits restoration to the active dialog and cycles Tab at its boundaries. Closing a reveal restores the original opener or falls back to the page heading when that control is unavailable. Route changes explicitly focus their heading; a skip link reaches the same content without changing the hash route. Import/backup recovery clears modal return state along with other session selections.

@@ -51,3 +51,9 @@ Final verification: strict TypeScript compilation, formatting, 76 unit tests and
 Five additional browser regressions reproduced and now verify timer recovery, backup selection reset, open-screen weekly refresh, challenge squad consistency and successful status announcements after errors. Import and restore clear transient UI state; an explicit retry verifies a successful save before resuming active timers. Paused time produces no catch-up progress. Calendar and seasonal supply changes refresh without navigation, while player-selected incomplete squads remain incomplete and cannot enter a challenge.
 
 Current automated coverage is 76 unit tests and 42 phone/desktop browser scenarios, with strict compilation and formatting checks passing. Timer recovery screenshots at 130% text size were inspected at both sizes with no horizontal overflow. The physical-device and human-playtest acceptance limits above remain outstanding.
+
+## Keyboard navigation review
+
+Same-screen updates preserve keyboard focus and expanded disclosures. Settings and biology choices no longer restart the tab sequence at the header, and combat selections retain their control focus. Dialog focus cycles in both directions and returns to the opener, with a heading fallback for disabled/removed controls. The first-tab skip link reaches the current screen's content without altering its route.
+
+Current verification passes 76 unit tests and 50 phone/desktop browser scenarios, strict compilation and formatting. The eight new keyboard runs cover settings, consecutive parent choices, regions, scanning, market/habitat selectors, combat, blueprint/offspring reveals, profile text selection and visiting disclosures. Focus screenshots were visually inspected. This is browser keyboard evidence; it does not complete the outstanding screen-reader, physical-device or human-enjoyment acceptance checks.
