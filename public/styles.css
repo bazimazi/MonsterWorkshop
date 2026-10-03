@@ -1603,3 +1603,12 @@ summary {
   display: block;
   font-size: 0.7rem;
 }
+
+.region-3 {
+  background: linear-gradient(145deg, #203f60, #315c77);
+  color: #b8f4ff;
+}
+.region-4 {
+  background: linear-gradient(145deg, #563544, #663b28);
+  color: #ffc783;
+}

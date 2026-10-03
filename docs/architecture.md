@@ -1,8 +1,8 @@
-# Monster Workshop: first playable slice
+# Monster Workshop architecture
 
 ## Scope and technology
 
-The repository initially contained README, license and a Node-oriented ignore file. No existing game systems or engine project were present. This implementation follows specification sections 117 and 120: **only the first vertical slice**, spanning phases 0–5. Phase 5 includes repeatable battle rewards and a sixth discoverable component to close the creation loop. Phases 6–12 remain separate work, gated by playtesting. Breeding specifically needs evidence that creation is fun.
+The repository initially contained README, license and a Node-oriented ignore file. Implementation began with the phases 0-5 vertical slice required by specification sections 117 and 120. The user's successive continuation instructions authorized phases 6-12, including proceeding past the breeding gate. All thirteen implementation phases are now complete, with separate commits and recorded validation. Human playtesting remains a release acceptance step.
 
 TypeScript, native browser ES modules, semantic HTML/CSS, SVG anatomy, Web Audio and localStorage form a mobile-first single-player game. Node 24 supplies build orchestration, a static development server and unit tests. TypeScript and Node types are development-only dependencies, justified by strict domain checking; Playwright provides browser verification and Prettier provides consistent formatting. There are no runtime libraries. A browser slice allows immediate Android/iOS browser play without requiring native engine tooling; native store packages, 3D rigs and online authority are outside this deliverable. The manifest supports a standalone launch where supported. A build-revision service worker caches the complete shell and catalog after the first online visit. HTTPS is needed when hosted outside localhost.
 
@@ -20,7 +20,7 @@ scripts/       build, local server, simulation tools
 docs/          architecture, phase evidence, manual playtest guide
 ```
 
-Presentation calls application actions; application orchestrates domain rules and injected storage/analytics. Domain has no DOM, network, localStorage or time dependencies. Creature creation receives seed and creation timestamp explicitly. Persisted data is decoded at every write/import boundary. UI changes happen only after the save transaction succeeds.
+Presentation calls application actions; application orchestrates domain rules and injected storage/analytics. Domain has no DOM, network, localStorage or current-clock reads; time calculations use explicit timestamps. Creature creation receives seed and creation timestamp explicitly. Persisted data is decoded at every write/import boundary. UI changes happen only after the save transaction succeeds.
 
 ## Domain model
 
@@ -72,16 +72,23 @@ The PRNG must never use `Math.random` inside domain generation. Content version 
   discoveredMutations: [id], creatures: [{
     id, signature, generationVersion, seed, componentIds,
     genome, mutationIds, name, experience, level, training, equipment,
-    createdAt, creator, history
+    createdAt, creator, history, lineage?
   }], experiments: [{ serial, creatureId, componentIds, seed,
     compatibility, mutationIds, createdAt, controlledMutation }],
   claimedBattles: [battleId], activeBattle: null | {
-    id, startedAt, round, turnIndex, order, rngState, status, reason, log,
+    id, startedAt, round, turnIndex, order, rngState, status, reason, log, challenge?,
     units: [{ id, team, source: CreatureSource, hp, energy, shield, statuses, cooldowns }]
   }, nextExpeditionSerial, resources: { resourceId: quantity },
   expeditions: [{ id, serial, regionId, source: CreatureSource, seed, elapsedMs, startedAt }],
   expeditionReports: [{ id, regionId, creatureId, outcome, reward }],
   completedResearch: [nodeId], scans: [{ componentId, level, scannedAt }],
+  births: [{ childId, parents: [CreatureSource, CreatureSource] }],
+  breedingCooldowns: { parentId: remainingMs }, towerFloor, bossVictories,
+  sales: [{ creatureId, orderSerial, biomass, resources }], biography,
+  showcase: [ownedId], blueprints: [{ id, name, author, componentIds, controlledMutation }],
+  gallery: [{ id, source: CreatureSource, profile: { name, bio } }],
+  eventRun: null | { window, startedAt, baselineSerial, baselineExpeditionSerial },
+  eventClaims: [{ run, completedAt, endSerial, endExpeditionSerial }],
   options: { sound, haptics, reducedMotion, textScale }
 }}
 ```
@@ -90,7 +97,7 @@ Derived stats, roles, phenotype and ability pool are reconstructed from source d
 
 ## Mutation architecture
 
-Rules evaluate tags rather than hard-coded recipes. The slice has one rare, discoverable **Electrical Overgrowth** mutation. An explicit developer simulation can force it, while player generation uses the normal seeded roll. Discoveries enter the codex and immutable experiment records. Preview shows anatomy and predictions; it does not reveal the random outcome before manufacture.
+Rules evaluate tags rather than hard-coded recipes. The initial slice introduced rare, discoverable **Electrical Overgrowth**; live content adds three event-bound mutations. An explicit developer simulation can force it, while player generation uses the normal seeded roll. Discoveries enter the codex and immutable experiment records. Preview shows anatomy and predictions; it does not reveal the random outcome before manufacture.
 
 ## Combat architecture
 
@@ -108,6 +115,12 @@ Use a pure turn resolver over immutable battle snapshots: three owned creatures 
 6. Exploration: biome gathering, specialization, prerequisites, resource storage and reusable discoveries; verify all regions, clock behavior, transactional claims and phone/desktop rendering.
 
 7. Research: observation-gated tree, progressive component scans, reusable biological blueprints, mutation analysis and paid guided creation; verify the entire tree from a fresh save and browser progression.
+
+8. Breeding: inherited anatomy/genetics, source snapshots, lineage and foreground cooldowns.
+9. Advanced combat: reactions, status control, team biology, boss phases, modifiers and saved tower floors.
+10. Economy: discovered supplies, crafting, archival sales, rotating NPC requests and simulation.
+11. Social: profiles, three-specimen showcases, portable visitors/recipes and paid blueprint manufacture.
+12. Live content: UTC event rotation, unique objective rewards, seasonal biology, limited mutations, new biomes and bosses.
 
 Each phase gets its own commit after checks pass. Following the first-slice delivery, the user requested continued implementation. The user's further continuation authorizes breeding and subsequent phases.
 
@@ -151,3 +164,16 @@ A unique sales ledger removes specimens from the active habitat while preserving
 Profiles and showcase ownership are local; portable JSON files provide manual social exchange without an account service. The share envelope uses its own format, version and content version. Creature sources retain genetics and creator metadata; imported derived properties are dropped. Visiting gallery entries and blueprint libraries are bounded and identity-checked, and neither affects discovery, currency or creature ownership. Source signatures provide deterministic identity, not cryptographic ownership certification. Profiles are user-authored, not verified accounts.
 
 Blueprints store normalized anatomy and optional guided mutation requirements, not exact genetic clones. Manufacturing routes through the existing stock/research/cost checks and fresh specimen serial/seed. The showcase holds up to three active owned IDs. Export, import, removal and profile changes have separate user controls; no automatic upload or message service is used. All displayed metadata is escaped.
+
+
+## Live content architecture
+
+The catalog defines a UTC epoch, period length and ordered experiment templates. Pure calendar functions accept an explicit timestamp; domain code never reads the current clock. Templates rotate locally and are bundled in the revisioned offline cache. Enrollment snapshots manufacture/expedition serials. Objectives derive from actual experiment sources and collected expedition reports; breeding, visiting specimens and earlier actions do not grant manufacturing progress. Completion snapshots final serial bounds and the time window, so later work cannot retroactively justify an earlier claim. Decoder validation reconstructs windows/objectives, rejects duplicate period claims and requires a completed event behind seasonal discoveries.
+
+Availability uses device UTC time in this single-player build. It grants no elapsed activity or automatic rewards. Changing dates, editing local storage or restoring old backups cannot be secured by a local client; future competitive services need server authority. Hidden/closed expeditions still pause. Expired enrollments can be replaced by the next event without losing already earned discoveries or specimens.
+
+Mutations may reference an event ID. Generation and forecasts apply the same window filter from the supplied creation timestamp. Sources store completed mutations, so later calendar changes do not rewrite genetics or phenotype. Eligible parents can pass limited biology outside its natural discovery window. Seasonal supplies require both discovery and active availability; held stock remains usable. New regions use the existing requirement/fitness/reward rules, and new bosses require completed regional fieldwork. Catalog and visual validation reject missing seasonal rewards, event/mutation links, biome dependencies or asset keys.
+
+## Final phase coverage
+
+Phases 8-12 add breeding, advanced combat, NPC economy, portable social exchange and rotating seasonal content on the same domain/application/presentation boundaries. All major actions remain transactional, source-driven and locally persisted. The five primary navigation destinations remain stable; breeding, challenges, marketplace, sharing and events are subordinate screens. Follow docs/progress.md for phase evidence and docs/playtest.md for the complete review path.

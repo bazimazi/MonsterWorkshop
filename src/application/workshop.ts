@@ -42,6 +42,7 @@ import {
   galleryId,
 } from '../domain/sharing.js';
 import type { Blueprint, Profile } from '../domain/sharing.js';
+import { currentEvent, eventProgress, seasonalAvailable } from '../domain/events.js';
 export interface BattleReward {
   victory: boolean;
   biomass: number;
@@ -188,9 +189,15 @@ export class Workshop {
       next.gallery = next.gallery.filter((g) => g.id !== id);
     });
   }
-  buy(id: string): void {
+  buy(id: string, at?: string): void {
     const offer = this.content.catalog.economy.offers.find((o) => o.id === id);
     if (!offer) throw new DomainError('Unknown market offer');
+    if (
+      offer.type === 'component' &&
+      this.content.component(offer.item).discovery === 'event' &&
+      (!at || !seasonalAvailable(offer.item, at, this.content))
+    )
+      throw new DomainError('Seasonal supplies require their active event');
     if (offer.type === 'component' && !this.value.discoveredComponents.includes(offer.item))
       throw new DomainError('Discover this biology before buying samples');
     this.transact((next) => {
@@ -199,9 +206,14 @@ export class Workshop {
       stock[offer.item] = (stock[offer.item] ?? 0) + offer.quantity;
     });
   }
-  craft(id: string): void {
+  craft(id: string, at?: string): void {
     const recipe = this.content.catalog.economy.recipes.find((r) => r.id === id);
     if (!recipe) throw new DomainError('Unknown crafting recipe');
+    if (
+      this.content.component(recipe.component).discovery === 'event' &&
+      (!at || !seasonalAvailable(recipe.component, at, this.content))
+    )
+      throw new DomainError('Seasonal crafting requires its active event');
     if (!this.value.discoveredComponents.includes(recipe.component))
       throw new DomainError('Discover this biology before crafting');
     this.transact((next) => {
@@ -250,6 +262,61 @@ export class Workshop {
           .map((r) => r.regionId),
       ),
     ];
+  }
+  joinEvent(at: string): void {
+    const window = currentEvent(at, this.content);
+    if (!window) throw new DomainError('The event calendar has not started');
+    if (this.value.eventClaims.some((claim) => claim.run.window.key === window.key))
+      throw new DomainError('This event reward was already claimed');
+    if (this.value.eventRun?.window.key === window.key)
+      throw new DomainError('Already enrolled in this experiment');
+    this.transact((next) => {
+      next.eventRun = {
+        window,
+        startedAt: at,
+        baselineSerial: next.nextSerial,
+        baselineExpeditionSerial: next.nextExpeditionSerial,
+      };
+    });
+  }
+  claimEvent(at: string): void {
+    const run = this.value.eventRun,
+      window = currentEvent(at, this.content);
+    if (
+      !run ||
+      !window ||
+      window.key !== run.window.key ||
+      Date.parse(at) < Date.parse(run.startedAt)
+    )
+      throw new DomainError('No current event reward');
+    const event = this.content.catalog.live.events.find((e) => e.id === window.templateId)!;
+    if (
+      eventProgress(
+        run,
+        this.value,
+        this.content,
+        this.value.nextSerial,
+        this.value.nextExpeditionSerial,
+        at,
+      ) < event.objective.count
+    )
+      throw new DomainError('Complete this experiment first');
+    this.transact((next) => {
+      next.biomass += event.biomass;
+      for (const [id, n] of Object.entries(event.resources))
+        next.resources[id] = (next.resources[id] ?? 0) + n;
+      next.inventory[event.component] = (next.inventory[event.component] ?? 0) + event.quantity;
+      if (!next.discoveredComponents.includes(event.component))
+        next.discoveredComponents.push(event.component);
+      next.eventClaims.push({
+        run,
+        completedAt: at,
+        endSerial: next.nextSerial,
+        endExpeditionSerial: next.nextExpeditionSerial,
+      });
+      next.eventRun = null;
+    });
+    this.analytics.track('seasonal_experiment_completed', { event: event.id });
   }
   get researchProgress(): ResearchProgress {
     const state = this.state;
@@ -587,6 +654,10 @@ export class Workshop {
         ? this.content.catalog.advanced.bosses.find((b) => b.id === challenge.bossId)
         : undefined;
     if (challenge?.kind === 'boss' && !boss) throw new DomainError('Unknown boss');
+    if (boss?.requiresRegion && !this.completedRegions.includes(boss.requiresRegion))
+      throw new DomainError(
+        `Explore ${this.content.region(boss.requiresRegion).name} before challenging this boss`,
+      );
     const enemies = this.content.catalog.rules.combat.opponents.map((o, index) => {
       const c = generateCreature(
         index === 0 && boss ? boss.components : o.components,
@@ -672,7 +743,11 @@ export class Workshop {
       quantities,
       newComponent,
       resources:
-        victory && battle.challenge ? (boss ? { 'storm-essence': 3 } : { crystal: 1 }) : {},
+        victory && battle.challenge
+          ? boss
+            ? structuredClone(boss.resources ?? { 'storm-essence': 3 })
+            : { crystal: 1 }
+          : {},
     };
     this.transact((next) => {
       next.biomass += reward.biomass;

@@ -4,6 +4,8 @@ import { ContentIndex, decodeCatalog } from '../dist/src/domain/catalog.js';
 import { generateCreature, validateAnatomy } from '../dist/src/domain/generator.js';
 import { chooseAction, createBattle, resolveAction } from '../dist/src/domain/combat.js';
 import { renderCreature } from '../dist/src/presentation/creature.js';
+import { currentEvent } from '../dist/src/domain/events.js';
+import { decodeShare } from '../dist/src/domain/sharing.js';
 import { orderAt, orderRequirements } from '../dist/src/domain/economy.js';
 import { Workshop } from '../dist/src/application/workshop.js';
 import { stateCodec } from '../dist/src/application/state.js';
@@ -49,7 +51,11 @@ function win(workshop) {
   while (battle.status === 'active') battle = workshop.battleAction(chooseAction(battle, content));
   return workshop.claimBattle().victory;
 }
-if (command === 'catalog')
+if (command === 'calendar')
+  console.log(JSON.stringify(currentEvent(args[0] ?? new Date().toISOString(), content), null, 2));
+else if (command === 'blueprint')
+  console.log(JSON.stringify(decodeShare(readFileSync(args[0], 'utf8'), content), null, 2));
+else if (command === 'catalog')
   console.table(
     content.catalog.components.map((p) => ({
       id: p.id,
@@ -190,5 +196,5 @@ else if (command === 'generate' || command === 'validate') {
   );
 } else
   console.log(
-    'Lab commands: catalog | generate [seed] [component IDs] [--mutation=id] | validate [seed] [IDs] | edit-genome source.json gene=value | mutations [trials] | combat [trials] | economy | profile',
+    'Lab commands: calendar [ISO date] | blueprint share.json | catalog | generate [seed] [component IDs] [--mutation=id] | validate [seed] [IDs] | edit-genome source.json gene=value | mutations [trials] | combat [trials] | economy | profile',
   );

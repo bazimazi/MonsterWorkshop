@@ -1,6 +1,7 @@
 import type { ContentIndex } from './catalog.js';
 import type { Component, Cost, Element, ResearchNode, Trait } from './model.js';
 import { DomainError, date, number, record, string } from './validation.js';
+import { currentEvent } from './events.js';
 
 export interface Scan {
   componentId: string;
@@ -124,6 +125,7 @@ export function mutationConditions(
   ids: string[],
   mutationId: string,
   content: ContentIndex,
+  at?: string,
 ): string[] {
   const mutation = content.mutations.get(mutationId);
   if (!mutation) throw new DomainError('Unknown mutation');
@@ -133,5 +135,7 @@ export function mutationConditions(
     .map((tag) => `Needs ${tag} biology.`);
   for (const tag of mutation.excludedTags)
     if (tags.has(tag)) reasons.push(`Cannot use ${tag} biology.`);
+  if (mutation.eventId && (!at || currentEvent(at, content)?.templateId !== mutation.eventId))
+    reasons.push('This limited mutation requires its active seasonal event.');
   return reasons;
 }

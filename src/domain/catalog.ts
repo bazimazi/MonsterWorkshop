@@ -11,6 +11,7 @@ import type {
 } from './model.js';
 import {
   DomainError,
+  date,
   list,
   member,
   modifiers,
@@ -94,7 +95,11 @@ export function decodeCatalog(raw: unknown): Catalog {
     member(p.slot, SLOTS, 'slot');
     member(p.rarity, ['common', 'uncommon', 'rare', 'epic', 'legendary'], 'rarity');
     member(p.element, ELEMENTS, 'element');
-    member(p.discovery, ['starter', 'battle', 'expedition', 'research', 'challenge'], 'discovery');
+    member(
+      p.discovery,
+      ['starter', 'battle', 'expedition', 'research', 'challenge', 'event'],
+      'discovery',
+    );
     modifiers(p.stats, STAT_KEYS, 'component stats');
     modifiers(p.genes, GENES, 'component genes');
     references(p.abilities, abilityIds, 'ability');
@@ -343,6 +348,12 @@ export function decodeCatalog(raw: unknown): Catalog {
     number(b.scale, 'boss scale', 0.5, 5);
     number(b.phaseAt, 'boss threshold', 0.1, 0.9);
     for (const key of ['shield', 'regeneration', 'biomass']) number(b[key], key, 1, 1000, true);
+    if (b.requiresRegion !== undefined) references([b.requiresRegion], regionIds, 'boss region');
+    if (b.resources !== undefined)
+      for (const [id, n] of Object.entries(record(b.resources, 'boss resources'))) {
+        references([id], resourceIds, 'boss resource');
+        number(n, 'boss resource quantity', 1, 100, true);
+      }
   }
   const economy = record(c.economy, 'economy');
   number(economy.saleRatio, 'sale ratio', 0.1, 0.8);
@@ -380,6 +391,52 @@ export function decodeCatalog(raw: unknown): Catalog {
       number(n, 'order reward', 1, 100, true);
     }
   }
+  const live = record(c.live, 'live content');
+  date(live.epoch, 'calendar epoch');
+  if (!(live.epoch as string).endsWith('Z')) throw new DomainError('Event calendar must use UTC');
+  number(live.periodDays, 'rotation days', 1, 90, true);
+  const events = table(live.events, 'events');
+  if (!events.length) throw new DomainError('Event calendar requires experiments');
+  const eventIds = new Set(events.map((e) => e.id as string));
+  for (const event of events) {
+    string(event.name, 'event name');
+    string(event.description, 'event description');
+    references([event.component], componentIds, 'seasonal component');
+    if (components.find((p) => p.id === event.component)?.discovery !== 'event')
+      throw new DomainError('Event rewards require seasonal biology');
+    references([event.mutation], new Set(mutations.map((m) => m.id as string)), 'event mutation');
+    if (mutations.find((m) => m.id === event.mutation)?.eventId !== event.id)
+      throw new DomainError('Limited mutation must belong to its event');
+    references(
+      [event.boss],
+      new Set((advanced.bosses as Record<string, unknown>[]).map((b) => b.id as string)),
+      'event boss',
+    );
+    for (const key of ['quantity', 'biomass']) number(event[key], key, 1, 1000, true);
+    for (const [id, n] of Object.entries(record(event.resources, 'event resources'))) {
+      references([id], resourceIds, 'event resource');
+      number(n, 'event reward quantity', 1, 100, true);
+    }
+    const objective = record(event.objective, 'event objective');
+    member(objective.type, ['manufacture', 'explore'], 'event objective');
+    number(objective.count, 'event objective count', 1, 20, true);
+    if (objective.type === 'manufacture')
+      references(
+        objective.tags,
+        new Set(components.flatMap((p) => p.tags as string[])),
+        'event biology',
+      );
+    else references([objective.regionId], regionIds, 'event region');
+  }
+  unique(
+    events.map((e) => e.component as string),
+    'seasonal rewards',
+  );
+  for (const m of mutations)
+    if (m.eventId !== undefined) references([m.eventId], eventIds, 'limited mutation event');
+  for (const p of components.filter((p) => p.discovery === 'event'))
+    if (!events.some((e) => e.component === p.id))
+      throw new DomainError('Seasonal component has no event');
   return structuredClone(c) as unknown as Catalog;
 }
 function validateCost(raw: unknown, resourceIds: Set<string>): void {

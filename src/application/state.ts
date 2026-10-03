@@ -30,6 +30,8 @@ import { orderAt, orderRequirements, salePrice } from '../domain/economy.js';
 import type { Sale } from '../domain/economy.js';
 import { decodeBlueprint, decodeGallery } from '../domain/sharing.js';
 import type { Blueprint, GalleryEntry } from '../domain/sharing.js';
+import { decodeEventRun, eventProgress } from '../domain/events.js';
+import type { EventRun, EventClaim } from '../domain/events.js';
 export interface Options {
   sound: boolean;
   haptics: boolean;
@@ -76,6 +78,8 @@ export interface PlayerState {
   showcase: string[];
   blueprints: Blueprint[];
   gallery: GalleryEntry[];
+  eventRun: EventRun | null;
+  eventClaims: EventClaim[];
 }
 export function initialState(content: ContentIndex, seed: number): PlayerState {
   const starter = content.catalog.components.filter((p) => p.discovery === 'starter');
@@ -111,6 +115,8 @@ export function initialState(content: ContentIndex, seed: number): PlayerState {
     showcase: [],
     blueprints: [],
     gallery: [],
+    eventRun: null,
+    eventClaims: [],
   };
 }
 export function decodeOptions(value: unknown): Options {
@@ -254,6 +260,7 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
         if (
           !creature ||
           creature.seed !== e.seed ||
+          creature.createdAt !== e.createdAt ||
           JSON.stringify(creature.componentIds) !== JSON.stringify(componentIds) ||
           JSON.stringify(creature.mutationIds) !== JSON.stringify(mutationIds)
         )
@@ -494,6 +501,76 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
       for (const id of bossVictories)
         if (!content.catalog.advanced.bosses.some((b) => b.id === id))
           throw new DomainError('Unknown defeated boss');
+      const eventRun =
+        s.eventRun === undefined || s.eventRun === null
+          ? null
+          : decodeEventRun(s.eventRun, content, s.nextSerial as number, nextExpeditionSerial);
+      const eventClaims = list(s.eventClaims ?? [], 'event claims', 10000).map((raw) => {
+        const claim = record(raw, 'event claim');
+        const run = decodeEventRun(
+          claim.run,
+          content,
+          s.nextSerial as number,
+          nextExpeditionSerial,
+        );
+        const completedAt = date(claim.completedAt, 'event completion');
+        if (
+          Date.parse(completedAt) < Date.parse(run.startedAt) ||
+          Date.parse(completedAt) >= Date.parse(run.window.endsAt)
+        )
+          throw new DomainError('Claim is outside its event');
+        const endSerial = number(
+          claim.endSerial,
+          'event completed serial',
+          run.baselineSerial,
+          s.nextSerial as number,
+          true,
+        );
+        const endExpeditionSerial = number(
+          claim.endExpeditionSerial,
+          'event completed expedition serial',
+          run.baselineExpeditionSerial,
+          nextExpeditionSerial,
+          true,
+        );
+        const event = content.catalog.live.events.find((e) => e.id === run.window.templateId)!;
+        if (
+          eventProgress(
+            run,
+            { creatures, experiments, expeditionReports, seedBase: s.seedBase as number },
+            content,
+            endSerial,
+            endExpeditionSerial,
+            completedAt,
+          ) < event.objective.count
+        )
+          throw new DomainError('Event objective has not been completed');
+        if (!discoveries.includes(event.component))
+          throw new DomainError('Event discovery is missing');
+        return { run, completedAt, endSerial, endExpeditionSerial };
+      });
+      unique(
+        eventClaims.map((claim) => claim.run.window.key),
+        'event reward claims',
+      );
+      if (eventRun && eventClaims.some((claim) => claim.run.window.key === eventRun.window.key))
+        throw new DomainError('Completed event is still enrolled');
+      for (const id of discoveries.filter((id) => content.component(id).discovery === 'event'))
+        if (
+          !eventClaims.some(
+            (claim) =>
+              content.catalog.live.events.find((e) => e.id === claim.run.window.templateId)!
+                .component === id,
+          )
+        )
+          throw new DomainError('Seasonal discovery requires a completed event');
+      if (activeBattle?.challenge?.kind === 'boss') {
+        const boss = content.catalog.advanced.bosses.find(
+          (b) => b.id === activeBattle.challenge!.bossId,
+        )!;
+        if (boss.requiresRegion && !completedRegions.includes(boss.requiresRegion))
+          throw new DomainError('Boss requires regional fieldwork');
+      }
       return structuredClone({
         contentVersion: s.contentVersion,
         playerName: s.playerName,
@@ -524,6 +601,8 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
         showcase,
         blueprints,
         gallery,
+        eventRun,
+        eventClaims,
       }) as PlayerState;
     },
   };

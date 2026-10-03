@@ -1,5 +1,84 @@
 import { test, expect } from '@playwright/test';
 import { fullResearchWorkshop } from '../helpers/research-workshop.mjs';
+test('weekly experiment earns seasonal anatomy, unlocks Frozen Peaks and enables its boss', async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.clock.setSystemTime(new Date('2026-10-03T00:00:00Z'));
+  const { w } = fullResearchWorkshop();
+  await page.goto('/#settings');
+  await page.getByLabel('Import save', { exact: true }).setInputFiles({
+    name: 'events.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(w.exportSave()),
+  });
+  await expect(page.getByRole('status')).toContainText('imported');
+  await page.getByRole('link', { name: 'Marketplace', exact: true }).click();
+  await page.getByRole('link', { name: 'Event calendar', exact: true }).click();
+  await page.getByRole('button', { name: 'Enroll in experiment' }).click();
+  await expect(page.getByRole('button', { name: 'Collect seasonal reward' })).toBeDisabled();
+  await page.getByRole('link', { name: 'Build event biology' }).click();
+  for (const part of ['Lightning Organ', 'Storm Wings'])
+    await page.getByRole('button', { name: part }).click();
+  for (let i = 0; i < 2; i++) {
+    await page.getByRole('button', { name: 'Manufacture creature' }).click();
+    await page.getByRole('button', { name: 'Skip sequence' }).click();
+    await page.getByRole('button', { name: 'Keep experimenting' }).click();
+  }
+  await page.goto('/#events');
+  await expect(page.getByRole('button', { name: 'Collect seasonal reward' })).toBeEnabled();
+  await page.screenshot({
+    path: `artifacts/events-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+  await page.getByRole('button', { name: 'Collect seasonal reward' }).click();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Enroll in experiment' })).toBeDisabled();
+  await page.getByRole('link', { name: 'Workshop', exact: true }).click();
+  await page.getByRole('button', { name: 'Aurora Organ' }).click();
+  await page.getByRole('button', { name: 'Storm Wings' }).click();
+  await page.getByRole('button', { name: 'Manufacture creature' }).click();
+  await page.getByRole('button', { name: 'Skip sequence' }).click();
+  await page.screenshot({
+    path: `artifacts/seasonal-creature-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+  await page.getByRole('button', { name: 'Keep experimenting' }).click();
+  const id = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('monster-workshop.save')).data.creatures.at(-1).id,
+  );
+  await page.getByRole('link', { name: 'Explore', exact: true }).click();
+  await page.getByRole('button', { name: 'Frozen Peaks' }).click();
+  await page.getByRole('combobox', { name: 'Expedition creature' }).selectOption(id);
+  await page.getByRole('button', { name: 'Send on expedition' }).click();
+  await page.clock.runFor(61000);
+  await page.getByRole('button', { name: 'Collect expedition' }).click();
+  await expect(page.getByRole('status')).toContainText('Glacial Chassis');
+  await page.goto('/#challenges');
+  await page.getByRole('button', { name: 'Challenge Frost Matriarch' }).click();
+  await expect(page.locator('.fight-card')).toHaveCount(6);
+  await page.screenshot({
+    path: `artifacts/live-boss-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+  await page.getByRole('button', { name: 'Retreat safely' }).click();
+  await page.getByRole('button', { name: 'Return to habitat' }).click();
+  const before = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('monster-workshop.save')).data.biomass,
+  );
+  await page.clock.setSystemTime(new Date('2026-10-06T00:00:00Z'));
+  await page.goto('/#events');
+  await expect(
+    page.getByRole('heading', { name: 'Cinder Lab', exact: true, level: 2 }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Collect seasonal reward' })).toBeDisabled();
+  expect(
+    await page.evaluate(
+      () => JSON.parse(localStorage.getItem('monster-workshop.save')).data.biomass,
+    ),
+  ).toBe(before);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
 test('profile, showcase and blueprint files roundtrip without granting visiting creature ownership', async ({
   page,
 }) => {

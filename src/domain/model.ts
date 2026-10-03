@@ -79,7 +79,7 @@ export interface Component {
   mutationChance: number;
   visual: VisualDefinition;
   lore: string;
-  discovery: 'starter' | 'battle' | 'expedition' | 'research' | 'challenge';
+  discovery: 'starter' | 'battle' | 'expedition' | 'research' | 'challenge' | 'event';
 }
 export interface Trait {
   id: string;
@@ -118,6 +118,7 @@ export interface Ability {
   effects: AbilityEffect[];
 }
 export interface Mutation {
+  eventId?: string;
   id: string;
   name: string;
   description: string;
@@ -246,6 +247,24 @@ export interface Catalog {
   resources: Resource[];
   regions: Region[];
   research: ResearchNode[];
+  live: {
+    epoch: string;
+    periodDays: number;
+    events: {
+      id: string;
+      name: string;
+      description: string;
+      objective:
+        | { type: 'manufacture'; tags: string[]; count: number }
+        | { type: 'explore'; regionId: string; count: number };
+      component: string;
+      quantity: number;
+      biomass: number;
+      resources: Record<string, number>;
+      mutation: string;
+      boss: string;
+    }[];
+  };
   economy: {
     offers: {
       id: string;
@@ -292,6 +311,8 @@ export interface Catalog {
       regeneration: number;
       discovery: string;
       biomass: number;
+      requiresRegion?: string;
+      resources?: Record<string, number>;
     }[];
   };
   rules: {

@@ -464,7 +464,7 @@
       "size": 1,
       "mutationChance": 0.06,
       "visual": {
-        "mesh": "lightning",
+        "mesh": "water",
         "anchor": "organ",
         "scale": 1,
         "allowedScale": [0.8, 1.2],
@@ -475,6 +475,291 @@
         "inheritColor": 0.1
       },
       "lore": "The hydra carries a living reservoir. Its currents prime enemies for lightning.",
+      "discovery": "challenge"
+    },
+    {
+      "id": "frost-organ",
+      "name": "Aurora Organ",
+      "slot": "organ",
+      "category": "elemental",
+      "rarity": "rare",
+      "element": "ice",
+      "stats": {
+        "hp": 8,
+        "power": 20,
+        "energy": 16,
+        "defense": 3
+      },
+      "genes": {
+        "element": 28,
+        "intelligence": 10,
+        "mutation": 14,
+        "adaptation": 18
+      },
+      "abilities": ["frost-bolt"],
+      "traits": ["conductive"],
+      "tags": ["frost", "winter", "elemental"],
+      "compatibleTags": ["frost", "winter", "elemental"],
+      "conflictTags": [],
+      "energyCost": 5,
+      "weight": 1,
+      "size": 1,
+      "mutationChance": 0.02,
+      "visual": {
+        "mesh": "frost",
+        "anchor": "organ",
+        "scale": 1,
+        "allowedScale": [0.8, 1.2],
+        "rotation": 0,
+        "allowedRotation": [-5, 5],
+        "layer": 6,
+        "color": "#93cfe9",
+        "inheritColor": 0
+      },
+      "lore": "Recovered through seasonal experiments. Its biology opens new designs.",
+      "discovery": "event"
+    },
+    {
+      "id": "ember-organ",
+      "name": "Cinder Heart",
+      "slot": "organ",
+      "category": "elemental",
+      "rarity": "rare",
+      "element": "fire",
+      "stats": {
+        "hp": 8,
+        "power": 24,
+        "energy": 12,
+        "attack": 3
+      },
+      "genes": {
+        "element": 28,
+        "intelligence": 10,
+        "mutation": 14,
+        "adaptation": 18
+      },
+      "abilities": ["ember-breath"],
+      "traits": ["conductive"],
+      "tags": ["ember", "heat", "elemental"],
+      "compatibleTags": ["ember", "heat", "elemental"],
+      "conflictTags": [],
+      "energyCost": 5,
+      "weight": 1,
+      "size": 1,
+      "mutationChance": 0.02,
+      "visual": {
+        "mesh": "ember",
+        "anchor": "organ",
+        "scale": 1,
+        "allowedScale": [0.8, 1.2],
+        "rotation": 0,
+        "allowedRotation": [-5, 5],
+        "layer": 6,
+        "color": "#fa9976",
+        "inheritColor": 0
+      },
+      "lore": "Recovered through seasonal experiments. Its biology opens new designs.",
+      "discovery": "event"
+    },
+    {
+      "id": "bloom-head",
+      "name": "Spring Blossom Crown",
+      "slot": "head",
+      "category": "Botanical",
+      "rarity": "rare",
+      "element": "nature",
+      "stats": {
+        "hp": 8,
+        "attack": 4,
+        "power": 12,
+        "speed": 3
+      },
+      "genes": {
+        "adaptation": 20,
+        "intelligence": 15,
+        "stability": 8
+      },
+      "abilities": ["mend"],
+      "traits": ["resilient"],
+      "tags": ["bloom", "plant", "herbal", "healer"],
+      "compatibleTags": ["bloom", "plant", "herbal", "healer"],
+      "conflictTags": [],
+      "energyCost": 4,
+      "weight": 2,
+      "size": 1,
+      "mutationChance": 0.02,
+      "visual": {
+        "mesh": "bloom",
+        "anchor": "head",
+        "scale": 1,
+        "allowedScale": [0.85, 1.15],
+        "rotation": 0,
+        "allowedRotation": [-10, 10],
+        "layer": 5,
+        "color": "#b5d78d",
+        "inheritColor": 0.15
+      },
+      "lore": "Recovered through seasonal experiments. Its biology opens new designs.",
+      "discovery": "event"
+    },
+    {
+      "id": "frost-body",
+      "name": "Glacial Chassis",
+      "slot": "body",
+      "category": "Mineral",
+      "rarity": "rare",
+      "element": "ice",
+      "stats": {
+        "hp": 40,
+        "attack": 6,
+        "defense": 17,
+        "speed": 3,
+        "power": 8,
+        "energy": 12
+      },
+      "genes": {
+        "vitality": 15,
+        "adaptation": 18,
+        "strength": 8
+      },
+      "abilities": ["crystal-guard"],
+      "traits": ["armored"],
+      "tags": ["frost", "winter", "mammal", "defender"],
+      "compatibleTags": ["frost", "winter", "mammal", "defender"],
+      "conflictTags": [],
+      "energyCost": 5,
+      "weight": 4,
+      "size": 1,
+      "mutationChance": 0.02,
+      "visual": {
+        "mesh": "frost-beast",
+        "anchor": "body",
+        "scale": 1,
+        "allowedScale": [0.85, 1.15],
+        "rotation": 0,
+        "allowedRotation": [0, 0],
+        "layer": 2,
+        "color": "#b0dce8",
+        "inheritColor": 0.2
+      },
+      "lore": "Recovered through extreme-biome fieldwork. Its biology opens new designs.",
+      "discovery": "expedition"
+    },
+    {
+      "id": "cinder-legs",
+      "name": "Ember Weaver Limbs",
+      "slot": "legs",
+      "category": "mobility",
+      "rarity": "rare",
+      "element": "fire",
+      "stats": {
+        "speed": 10,
+        "attack": 4
+      },
+      "genes": {
+        "speed": 18,
+        "mutation": 12
+      },
+      "abilities": ["molten-snare"],
+      "traits": ["nimble"],
+      "tags": ["ember", "heat", "arachnid", "climber"],
+      "compatibleTags": ["ember", "heat", "arachnid", "climber"],
+      "conflictTags": [],
+      "energyCost": 2,
+      "weight": 2,
+      "size": 1,
+      "mutationChance": 0.02,
+      "visual": {
+        "mesh": "cinder",
+        "anchor": "legs",
+        "scale": 1,
+        "allowedScale": [0.9, 1.1],
+        "rotation": 0,
+        "allowedRotation": [0, 0],
+        "layer": 1,
+        "color": "#d99081",
+        "inheritColor": 0.65
+      },
+      "lore": "Recovered through extreme-biome fieldwork. Its biology opens new designs.",
+      "discovery": "expedition"
+    },
+    {
+      "id": "frost-armor",
+      "name": "Matriarch Ice Plate",
+      "slot": "armor",
+      "category": "defensive",
+      "rarity": "rare",
+      "element": "ice",
+      "stats": {
+        "hp": 12,
+        "defense": 16,
+        "speed": -3
+      },
+      "genes": {
+        "stability": 20,
+        "vitality": 12,
+        "adaptation": 18
+      },
+      "abilities": ["glacial-guard"],
+      "traits": ["armored"],
+      "tags": ["frost", "crystal", "defender"],
+      "compatibleTags": ["frost", "crystal", "defender"],
+      "conflictTags": [],
+      "energyCost": 3,
+      "weight": 5,
+      "size": 1,
+      "mutationChance": 0.02,
+      "visual": {
+        "mesh": "glacier",
+        "anchor": "armor",
+        "scale": 1,
+        "allowedScale": [0.9, 1.1],
+        "rotation": 0,
+        "allowedRotation": [0, 0],
+        "layer": 4,
+        "color": "#9ce1ea",
+        "inheritColor": 0.15
+      },
+      "lore": "Recovered through extreme-biome fieldwork. Its biology opens new designs.",
+      "discovery": "challenge"
+    },
+    {
+      "id": "cinder-head",
+      "name": "Chimera Crest",
+      "slot": "head",
+      "category": "anatomical",
+      "rarity": "rare",
+      "element": "fire",
+      "stats": {
+        "attack": 8,
+        "power": 5
+      },
+      "genes": {
+        "strength": 18,
+        "intelligence": 12,
+        "element": 16
+      },
+      "abilities": ["ember-breath"],
+      "traits": ["draconic"],
+      "tags": ["ember", "dragon", "heat", "predator"],
+      "compatibleTags": ["ember", "dragon", "heat", "predator"],
+      "conflictTags": [],
+      "energyCost": 2,
+      "weight": 2,
+      "size": 1,
+      "mutationChance": 0.02,
+      "visual": {
+        "mesh": "dragon",
+        "anchor": "head",
+        "scale": 1,
+        "allowedScale": [0.85, 1.15],
+        "rotation": 0,
+        "allowedRotation": [-10, 10],
+        "layer": 5,
+        "color": "#e6a98c",
+        "inheritColor": 0.7
+      },
+      "lore": "Recovered through extreme-biome fieldwork. Its biology opens new designs.",
       "discovery": "challenge"
     }
   ],
@@ -710,6 +995,76 @@
           "potency": 0
         }
       ]
+    },
+    {
+      "id": "frost-bolt",
+      "name": "Frost Bolt",
+      "description": "Ice power slows the target. Wet targets freeze in advanced challenges.",
+      "cost": 7,
+      "cooldown": 1,
+      "target": "enemy",
+      "effects": [
+        {
+          "type": "damage",
+          "scaling": "power",
+          "power": 1.15,
+          "element": "ice"
+        },
+        {
+          "type": "status",
+          "status": "slow",
+          "duration": 2,
+          "potency": 0.25,
+          "chance": 1
+        }
+      ],
+      "tags": ["ice", "control"]
+    },
+    {
+      "id": "molten-snare",
+      "name": "Molten Snare",
+      "description": "Scorches enemy plating and weakens armor.",
+      "cost": 6,
+      "cooldown": 1,
+      "target": "enemy",
+      "effects": [
+        {
+          "type": "damage",
+          "scaling": "attack",
+          "power": 1.05,
+          "element": "fire"
+        },
+        {
+          "type": "status",
+          "status": "armor-break",
+          "duration": 2,
+          "potency": 0.25,
+          "chance": 1
+        }
+      ],
+      "tags": ["fire", "control"]
+    },
+    {
+      "id": "glacial-guard",
+      "name": "Glacial Guard",
+      "description": "Builds a shield and invigorates the caster.",
+      "cost": 8,
+      "cooldown": 2,
+      "target": "self",
+      "effects": [
+        {
+          "type": "shield",
+          "power": 27.2
+        },
+        {
+          "type": "status",
+          "status": "haste",
+          "duration": 2,
+          "potency": 0.2,
+          "chance": 1
+        }
+      ],
+      "tags": ["ice", "support"]
     }
   ],
   "mutations": [
@@ -731,6 +1086,66 @@
       "abilities": ["thunder-pulse"],
       "traits": ["overcharged"],
       "feature": "electric-spines"
+    },
+    {
+      "id": "storm-frost",
+      "eventId": "aurora-lab",
+      "name": "Storm Frost",
+      "description": "Frozen lightning grows a luminous ice crown. Natural and guided creation is available during Aurora Lab; descendants can inherit the biology.",
+      "requiredTags": ["frost", "electric", "flyer"],
+      "excludedTags": [],
+      "chance": 0.08,
+      "stats": {
+        "defense": 5,
+        "power": 7
+      },
+      "genes": {
+        "adaptation": 6,
+        "element": 5
+      },
+      "abilities": ["frost-bolt"],
+      "traits": ["armored"],
+      "feature": "frost-crown"
+    },
+    {
+      "id": "ember-crown",
+      "eventId": "cinder-lab",
+      "name": "Ember Crown",
+      "description": "Heat-loving dragon biology sprouts living flames. Available during Cinder Lab.",
+      "requiredTags": ["ember", "dragon"],
+      "excludedTags": [],
+      "chance": 0.06,
+      "stats": {
+        "attack": 6,
+        "power": 6
+      },
+      "genes": {
+        "strength": 5,
+        "mutation": 5
+      },
+      "abilities": ["ember-breath"],
+      "traits": ["draconic"],
+      "feature": "ember-crown"
+    },
+    {
+      "id": "living-bloom",
+      "eventId": "bloom-lab",
+      "name": "Living Bloom",
+      "description": "Seasonal plant biology flowers across the creature. Available during Bloom Lab.",
+      "requiredTags": ["bloom", "herbal"],
+      "excludedTags": [],
+      "chance": 0.07,
+      "stats": {
+        "hp": 16,
+        "energy": 6
+      },
+      "genes": {
+        "adaptation": 7,
+        "vitality": 4
+      },
+      "abilities": [],
+      "traits": ["resilient"],
+      "feature": "living-bloom"
     }
   ],
   "rules": {
@@ -1002,6 +1417,44 @@
       "restock": ["lightning-organ", "storm-wings"],
       "discovery": "gale-wings",
       "discoveryChance": 0.3
+    },
+    {
+      "id": "frozen-peaks",
+      "name": "Frozen Peaks",
+      "description": "Auroras shine over glacial cliffs. Frost-adapted flyers recover ancient ice biology.",
+      "activity": "Aurora survey",
+      "durationMs": 60000,
+      "prerequisites": ["storm-valley"],
+      "requiredTags": ["frost", "flyer"],
+      "minimumStats": {
+        "hp": 90
+      },
+      "affinityTags": ["frost", "winter", "flyer"],
+      "biomass": 28,
+      "resource": "crystal",
+      "quantity": 4,
+      "restock": ["crystal-armor", "storm-wings"],
+      "discovery": "frost-body",
+      "discoveryChance": 0.18
+    },
+    {
+      "id": "ashen-grove",
+      "name": "Ashen Grove",
+      "description": "Heat-loving creatures climb through the ember canopy to find resilient weaver anatomy.",
+      "activity": "Ember survey",
+      "durationMs": 70000,
+      "prerequisites": ["storm-valley"],
+      "requiredTags": ["ember", "dragon"],
+      "minimumStats": {
+        "hp": 90
+      },
+      "affinityTags": ["ember", "heat", "climber"],
+      "biomass": 30,
+      "resource": "storm-essence",
+      "quantity": 3,
+      "restock": ["dragon-head", "spider-legs"],
+      "discovery": "cinder-legs",
+      "discoveryChance": 0.18
     }
   ],
   "research": [
@@ -1246,6 +1699,38 @@
         "regeneration": 6,
         "discovery": "tide-organ",
         "biomass": 65
+      },
+      {
+        "id": "frost-matriarch",
+        "name": "Frost Matriarch",
+        "components": ["dragon-head", "frost-body", "frost-organ", "crystal-armor", "storm-wings"],
+        "seed": 133,
+        "scale": 1.12,
+        "phaseAt": 0.55,
+        "shield": 40,
+        "regeneration": 7,
+        "discovery": "frost-armor",
+        "biomass": 75,
+        "requiresRegion": "frozen-peaks",
+        "resources": {
+          "crystal": 4
+        }
+      },
+      {
+        "id": "cinder-chimera",
+        "name": "Cinder Chimera",
+        "components": ["dragon-head", "wolf-body", "cinder-legs", "ember-organ", "crystal-armor"],
+        "seed": 205,
+        "scale": 1.15,
+        "phaseAt": 0.4,
+        "shield": 25,
+        "regeneration": 5,
+        "discovery": "cinder-head",
+        "biomass": 80,
+        "requiresRegion": "ashen-grove",
+        "resources": {
+          "storm-essence": 4
+        }
       }
     ]
   },
@@ -1358,6 +1843,55 @@
         "item": "storm-essence",
         "quantity": 3,
         "price": 30
+      },
+      {
+        "id": "buy-frost-organ",
+        "type": "component",
+        "item": "frost-organ",
+        "quantity": 1,
+        "price": 26
+      },
+      {
+        "id": "buy-ember-organ",
+        "type": "component",
+        "item": "ember-organ",
+        "quantity": 1,
+        "price": 26
+      },
+      {
+        "id": "buy-bloom-head",
+        "type": "component",
+        "item": "bloom-head",
+        "quantity": 1,
+        "price": 26
+      },
+      {
+        "id": "buy-frost-body",
+        "type": "component",
+        "item": "frost-body",
+        "quantity": 1,
+        "price": 26
+      },
+      {
+        "id": "buy-cinder-legs",
+        "type": "component",
+        "item": "cinder-legs",
+        "quantity": 1,
+        "price": 26
+      },
+      {
+        "id": "buy-frost-armor",
+        "type": "component",
+        "item": "frost-armor",
+        "quantity": 1,
+        "price": 26
+      },
+      {
+        "id": "buy-cinder-head",
+        "type": "component",
+        "item": "cinder-head",
+        "quantity": 1,
+        "price": 26
       }
     ],
     "recipes": [
@@ -1468,6 +2002,90 @@
             "crystal": 1
           }
         }
+      },
+      {
+        "id": "craft-frost-organ",
+        "component": "frost-organ",
+        "quantity": 1,
+        "cost": {
+          "biomass": 6,
+          "resources": {
+            "fiber": 2,
+            "crystal": 2
+          }
+        }
+      },
+      {
+        "id": "craft-ember-organ",
+        "component": "ember-organ",
+        "quantity": 1,
+        "cost": {
+          "biomass": 6,
+          "resources": {
+            "fiber": 2,
+            "crystal": 2
+          }
+        }
+      },
+      {
+        "id": "craft-bloom-head",
+        "component": "bloom-head",
+        "quantity": 1,
+        "cost": {
+          "biomass": 6,
+          "resources": {
+            "fiber": 2,
+            "crystal": 2
+          }
+        }
+      },
+      {
+        "id": "craft-frost-body",
+        "component": "frost-body",
+        "quantity": 1,
+        "cost": {
+          "biomass": 6,
+          "resources": {
+            "fiber": 2,
+            "crystal": 2
+          }
+        }
+      },
+      {
+        "id": "craft-cinder-legs",
+        "component": "cinder-legs",
+        "quantity": 1,
+        "cost": {
+          "biomass": 6,
+          "resources": {
+            "fiber": 2,
+            "crystal": 2
+          }
+        }
+      },
+      {
+        "id": "craft-frost-armor",
+        "component": "frost-armor",
+        "quantity": 1,
+        "cost": {
+          "biomass": 6,
+          "resources": {
+            "fiber": 2,
+            "crystal": 2
+          }
+        }
+      },
+      {
+        "id": "craft-cinder-head",
+        "component": "cinder-head",
+        "quantity": 1,
+        "cost": {
+          "biomass": 6,
+          "resources": {
+            "fiber": 2,
+            "crystal": 2
+          }
+        }
       }
     ],
     "orders": [
@@ -1518,6 +2136,66 @@
         "resources": {
           "storm-essence": 1
         }
+      }
+    ]
+  },
+  "live": {
+    "epoch": "2026-09-28T00:00:00.000Z",
+    "periodDays": 7,
+    "events": [
+      {
+        "id": "aurora-lab",
+        "name": "Aurora Lab",
+        "description": "Combine flight and electric biology. Earn seasonal ice anatomy, then search for Storm Frost.",
+        "objective": {
+          "type": "manufacture",
+          "tags": ["electric", "flyer"],
+          "count": 2
+        },
+        "component": "frost-organ",
+        "quantity": 3,
+        "biomass": 30,
+        "resources": {
+          "fiber": 3
+        },
+        "mutation": "storm-frost",
+        "boss": "frost-matriarch"
+      },
+      {
+        "id": "cinder-lab",
+        "name": "Cinder Lab",
+        "description": "Engineer dragon/electric hybrids. Recover heat-loving anatomy and explore the Ashen Grove.",
+        "objective": {
+          "type": "manufacture",
+          "tags": ["dragon", "electric"],
+          "count": 2
+        },
+        "component": "ember-organ",
+        "quantity": 3,
+        "biomass": 30,
+        "resources": {
+          "crystal": 2
+        },
+        "mutation": "ember-crown",
+        "boss": "cinder-chimera"
+      },
+      {
+        "id": "bloom-lab",
+        "name": "Bloom Lab",
+        "description": "Map the meadow twice with fresh expeditions. Bring seasonal floral biology into the workshop.",
+        "objective": {
+          "type": "explore",
+          "regionId": "green-meadow",
+          "count": 2
+        },
+        "component": "bloom-head",
+        "quantity": 3,
+        "biomass": 25,
+        "resources": {
+          "fiber": 4
+        },
+        "mutation": "living-bloom",
+        "boss": "storm-hydra"
       }
     ]
   }

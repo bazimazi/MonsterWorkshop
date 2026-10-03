@@ -21,6 +21,13 @@ export const MESH_KEYS = [
   'crystal-beast',
   'verdant',
   'prism',
+  'water',
+  'frost',
+  'ember',
+  'bloom',
+  'frost-beast',
+  'cinder',
+  'glacier',
 ];
 const visualCaches = new WeakMap<ContentIndex, Map<string, string>>();
 const MAX_CACHED_VISUALS = 128;
@@ -39,6 +46,20 @@ function mesh(key: string, color: string, glow: string, hasLegs: boolean): strin
     light = blend(color, '#ffffff', 0.27);
   const line = 'stroke="#302741" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"';
   switch (key) {
+    case 'water':
+      return `<g ${line}><path d="M0 -34Q-36 5 -19 25Q0 45 19 25Q36 5 0 -34Z" fill="${color}"/><path d="M-7 -9Q-24 16 -6 22" stroke="${glow}" fill="none"/></g>`;
+    case 'frost':
+      return `<g ${line}><path d="M0 -35 23 -10 16 24 0 35 -16 24 -23 -10Z" fill="${color}"/><path d="M0 -23 0 25M-14 -9 14 13M14 -9 -14 13" stroke="${glow}"/><path d="M-8 -22 0 -14 8 -22M-14 19 0 11 14 19" stroke="${light}" fill="none"/></g>`;
+    case 'ember':
+      return `<g ${line}><path d="M0 -34Q32 2 20 23Q0 44 -20 23Q-30 8 -13 -14Q-13 9 0 -34Z" fill="${color}"/><path d="M0 -8Q20 17 0 30Q-20 17 0 -8Z" fill="${glow}" stroke="none"/></g>`;
+    case 'bloom':
+      return `${mesh('verdant', color, glow, hasLegs)}<g fill="#eeb6dd" ${line}><circle cx="-31" cy="-30" r="9"/><circle cx="31" cy="-30" r="9"/><circle cy="-40" r="12"/></g><g fill="${glow}"><circle cx="-31" cy="-30" r="3"/><circle cx="31" cy="-30" r="3"/><circle cy="-40" r="4"/></g>`;
+    case 'frost-beast':
+      return `${mesh('wolf', color, glow, hasLegs)}<g ${line} fill="${light}"><path d="M-63 -18 -62 -57 -44 -32 -32 -69 -21 -40 0 -64 16 -32 41 -59 56 -19Z"/><path d="M-35 -42 -31 -21M0 -47 0 -25M39 -39 42 -23" stroke="${glow}"/></g>`;
+    case 'cinder':
+      return `${mesh('spider', color, glow, hasLegs)}<g fill="${glow}" ${line}><path d="M-103 44 -98 20 -87 40 -72 34 -77 53Z M103 44 98 20 87 40 72 34 77 53Z"/></g>`;
+    case 'glacier':
+      return `${mesh('crystal', color, glow, hasLegs)}<path d="M-40 -21 -32 -46 -13 -28 0 -50 13 -28 32 -46 40 -21" fill="${light}" ${line}/>`;
     case 'verdant':
       return `${mesh('dragon', color, glow, hasLegs)}<g ${line}><path d="M-51 -3Q-89 -27 -67 -48Q-41 -32 -51 -3ZM51 -3Q89 -27 67 -48Q41 -32 51 -3Z" fill="${light}"/><path d="M-51 -3 -65 -34M51 -3 65 -34" stroke="${dark}"/></g>`;
     case 'prism':
@@ -87,6 +108,11 @@ export function validateVisuals(content: ContentIndex): void {
   for (const component of content.components.values())
     if (!MESH_KEYS.includes(component.visual.mesh))
       throw new Error(`Missing visual for ${component.name}`);
+  for (const mutation of content.mutations.values())
+    if (
+      !['electric-spines', 'frost-crown', 'ember-crown', 'living-bloom'].includes(mutation.feature)
+    )
+      throw new Error(`Missing phenotype visual for ${mutation.name}`);
 }
 export function renderCreature(creature: Creature, content: ContentIndex, animate = true): string {
   // Profiling showed cheap assembly; a bounded cache also avoids rebuilding unchanged habitat SVGs.
@@ -120,9 +146,20 @@ export function renderCreature(creature: Creature, content: ContentIndex, animat
       return `<g data-slot="${part.slot}" data-component="${escape(part.id)}" transform="translate(${x} ${y}) rotate(${rotation}) scale(${scale.toFixed(3)})">${mesh(v.mesh, color, creature.phenotype.glowColor, !!creature.anatomy.legs)}</g>`;
     })
     .join('');
-  const mutations = creature.phenotype.features.includes('electric-spines')
+  let mutations = creature.phenotype.features.includes('electric-spines')
     ? `<g data-feature="electric-spines" fill="${creature.phenotype.glowColor}" stroke="#302741" stroke-width="3"><path d="M129 169 118 137 144 153ZM272 171 285 139 258 155ZM166 85 156 58 177 78ZM234 85 246 58 223 78Z"/><path d="M83 173 69 159 75 185M317 173 331 159 325 185" fill="none" stroke="${creature.phenotype.glowColor}"/></g>`
     : '';
+  for (const feature of creature.phenotype.features) {
+    if (feature === 'frost-crown')
+      mutations +=
+        '<g data-feature="frost-crown" fill="#d1f9ff" stroke="#588ba2" stroke-width="3"><path d="M163 83 154 48 179 68 199 39 220 68 246 48 237 83Z"/><circle cx="200" cy="61" r="7" fill="#8adbe7"/></g>';
+    if (feature === 'ember-crown')
+      mutations +=
+        '<g data-feature="ember-crown" fill="#ffc66e" stroke="#be635c" stroke-width="3"><path d="M164 85Q142 56 173 38Q156 63 185 64Q179 36 205 23Q193 56 223 65Q219 43 243 39Q232 67 240 85Z"/></g>';
+    if (feature === 'living-bloom')
+      mutations +=
+        '<g data-feature="living-bloom" fill="#ecb3d4" stroke="#687c58" stroke-width="3"><circle cx="138" cy="166" r="12"/><circle cx="264" cy="168" r="12"/><circle cx="200" cy="68" r="13"/></g><g fill="#ffd988"><circle cx="138" cy="166" r="4"/><circle cx="264" cy="168" r="4"/><circle cx="200" cy="68" r="5"/></g>';
+  }
   const result = `<svg class="creature-svg ${animate ? 'idle' : ''}" viewBox="0 0 400 320" role="img" aria-label="${escape(creature.name)} — ${escape(creature.element)} creature${creature.mutationIds.length ? ', mutated' : ''}"><ellipse class="creature-shadow" cx="200" cy="282" rx="99" ry="13" fill="#070b1d" opacity=".28"/><g class="anatomy" style="--glow:${creature.phenotype.glowColor}" transform="translate(200 170) scale(${creature.phenotype.bodyScale.toFixed(3)}) translate(-200 -170)">${anatomy}${mutations}</g></svg>`;
   if (cache.size >= MAX_CACHED_VISUALS) cache.delete(cache.keys().next().value!);
   cache.set(key, result);

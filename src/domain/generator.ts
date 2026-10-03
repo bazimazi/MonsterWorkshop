@@ -14,6 +14,7 @@ import { GENES, SLOTS, STAT_KEYS } from './model.js';
 import { DomainError, number, unique } from './validation.js';
 import { decodeCreature } from './serialization.js';
 import { clamp, hash, Random } from './random.js';
+import { currentEvent } from './events.js';
 export function validateAnatomy(ids: string[], content: ContentIndex): Component[] {
   if (!ids.length || ids.length > SLOTS.length)
     throw new DomainError('Select a head and body to begin');
@@ -27,7 +28,7 @@ export function validateAnatomy(ids: string[], content: ContentIndex): Component
     if (!parts.some((p) => p.slot === slot)) throw new DomainError(`A ${slot} is required`);
   return parts.sort((a, b) => SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot));
 }
-export function analyzeDesign(ids: string[], content: ContentIndex): Compatibility {
+export function analyzeDesign(ids: string[], content: ContentIndex, at?: string): Compatibility {
   const parts = validateAnatomy(ids, content),
     rules = content.catalog.rules.generation;
   let score = rules.baseCompatibility;
@@ -71,7 +72,8 @@ export function analyzeDesign(ids: string[], content: ContentIndex): Compatibili
   const eligible = content.catalog.mutations.filter(
     (m) =>
       m.requiredTags.every((t) => tags.includes(t)) &&
-      !m.excludedTags.some((t) => tags.includes(t)),
+      !m.excludedTags.some((t) => tags.includes(t)) &&
+      (!m.eventId || (at && currentEvent(at, content)?.templateId === m.eventId)),
   );
   const bonus =
     rules.baseMutationChance +
@@ -116,7 +118,7 @@ function addStats(stats: Stats, modifiers: StatModifiers): void {
 export function deriveCreature(source: CreatureSource, content: ContentIndex): Creature {
   const valid = decodeCreature(source, content),
     parts = validateAnatomy(valid.componentIds, content);
-  const compatibility = analyzeDesign(valid.componentIds, content),
+  const compatibility = analyzeDesign(valid.componentIds, content, valid.createdAt),
     rules = content.catalog.rules.generation;
   const mutations = valid.mutationIds.map((id) => content.mutations.get(id)!);
   const band = selectQuality(valid.genome, compatibility, content);
@@ -203,7 +205,7 @@ export function generateCreature(
 ): Creature {
   number(options.seed, 'seed', 0, 0xffffffff, true);
   const parts = validateAnatomy(ids, content),
-    compatibility = analyzeDesign(ids, content),
+    compatibility = analyzeDesign(ids, content, options.createdAt),
     rules = content.catalog.rules.generation;
   const fingerprint = `${rules.version}:${options.seed}:${parts.map((p) => p.id).join('|')}`;
   const signature = hash(fingerprint).toString(16).padStart(8, '0'),
@@ -226,7 +228,10 @@ export function generateCreature(
   const tags = new Set(parts.flatMap((p) => p.tags));
   const eligible = content.catalog.mutations
     .filter(
-      (m) => m.requiredTags.every((t) => tags.has(t)) && !m.excludedTags.some((t) => tags.has(t)),
+      (m) =>
+        m.requiredTags.every((t) => tags.has(t)) &&
+        !m.excludedTags.some((t) => tags.has(t)) &&
+        (!m.eventId || currentEvent(options.createdAt, content)?.templateId === m.eventId),
     )
     .sort((a, b) => a.id.localeCompare(b.id, 'en'));
   if (options.forceMutation && !eligible.some((m) => m.id === options.forceMutation))

@@ -12,6 +12,7 @@ import { escape, title } from './html.js';
 import { availableAbilities, canUse, currentActor } from '../domain/combat.js';
 import type { Battle, Combatant } from '../domain/combat.js';
 import { deriveCreature } from '../domain/generator.js';
+import { eventsView } from './events.js';
 import { socialView } from './social.js';
 import { marketView } from './market.js';
 import { challengesView } from './challenges.js';
@@ -205,40 +206,42 @@ export class GameUI {
       this.controlledMutation = undefined;
     const screen = this.nav.current;
     const body =
-      screen === 'social'
-        ? socialView(this.workshop, this.socialCreature)
-        : screen === 'market'
-          ? marketView(this.workshop, this.marketOffer, this.marketRecipe, this.marketCreature)
-          : screen === 'challenges'
-            ? challengesView(this.workshop, [...this.squad], this.challengeModifier)
-            : screen === 'breeding'
-              ? breedingView(this.workshop, ...this.parents)
-              : screen === 'research'
-                ? researchView(
-                    state,
-                    this.workshop,
-                    this.content,
-                    state.discoveredComponents.includes(this.scannerId)
-                      ? this.scannerId
-                      : state.discoveredComponents[0]!,
-                  )
-                : screen === 'explore'
-                  ? explorationView(
+      screen === 'events'
+        ? eventsView(this.workshop, new Date().toISOString())
+        : screen === 'social'
+          ? socialView(this.workshop, this.socialCreature)
+          : screen === 'market'
+            ? marketView(this.workshop, this.marketOffer, this.marketRecipe, this.marketCreature)
+            : screen === 'challenges'
+              ? challengesView(this.workshop, [...this.squad], this.challengeModifier)
+              : screen === 'breeding'
+                ? breedingView(this.workshop, ...this.parents)
+                : screen === 'research'
+                  ? researchView(
                       state,
                       this.workshop,
                       this.content,
-                      this.regionId,
-                      this.explorerId,
+                      state.discoveredComponents.includes(this.scannerId)
+                        ? this.scannerId
+                        : state.discoveredComponents[0]!,
                     )
-                  : screen === 'creatures'
-                    ? this.creaturesView(state)
-                    : screen === 'battle'
-                      ? this.battleView(state)
-                      : screen === 'journal'
-                        ? this.journalView(state)
-                        : screen === 'settings'
-                          ? this.settingsView(state)
-                          : this.workshopView(state);
+                  : screen === 'explore'
+                    ? explorationView(
+                        state,
+                        this.workshop,
+                        this.content,
+                        this.regionId,
+                        this.explorerId,
+                      )
+                    : screen === 'creatures'
+                      ? this.creaturesView(state)
+                      : screen === 'battle'
+                        ? this.battleView(state)
+                        : screen === 'journal'
+                          ? this.journalView(state)
+                          : screen === 'settings'
+                            ? this.settingsView(state)
+                            : this.workshopView(state);
     const tabs: [Screen, string, string][] = [
       ['workshop', 'Workshop', '⚗'],
       ['creatures', 'Creatures', '◈'],
@@ -264,11 +267,16 @@ export class GameUI {
     try {
       return generateCreature([...this.selected], this.content, {
         seed: 0,
-        createdAt: '2026-10-02T00:00:00Z',
+        createdAt: new Date().toISOString(),
         creator: 'Preview',
         skipMutations: true,
         ...(this.controlledMutation &&
-        !mutationConditions([...this.selected], this.controlledMutation, this.content).length
+        !mutationConditions(
+          [...this.selected],
+          this.controlledMutation,
+          this.content,
+          new Date().toISOString(),
+        ).length
           ? { forceMutation: this.controlledMutation }
           : {}),
       });
@@ -290,7 +298,12 @@ export class GameUI {
     const controlAvailable = hasResearch(state.completedResearch, 'mutation-control', this.content);
     const controlReasons = this.controlledMutation
       ? [
-          ...mutationConditions([...this.selected], this.controlledMutation, this.content),
+          ...mutationConditions(
+            [...this.selected],
+            this.controlledMutation,
+            this.content,
+            new Date().toISOString(),
+          ),
           ...costRequirements(
             this.content.catalog.rules.research.controlledMutationCost,
             state.biomass,
@@ -340,7 +353,7 @@ export class GameUI {
         const discovered = state.discoveredComponents.includes(p.id),
           selected = this.selected.has(p.id),
           quantity = state.inventory[p.id] ?? 0;
-        return `<button class="part ${selected ? 'selected' : ''} ${!discovered ? 'locked' : ''}" data-action="part" data-part="${p.id}" aria-pressed="${selected}" ${!discovered || (!selected && quantity === 0) ? 'disabled' : ''}><span class="part-icon" aria-hidden="true">${discovered ? { head: '♜', body: '◆', legs: '╳', organ: 'ϟ', armor: '⬡', wings: '⋈' }[p.slot] : '?'}</span><span class="part-copy"><strong>${discovered ? escape(p.name) : 'Unknown component'}</strong><small>${title(p.slot)} · ${discovered ? title(p.element) : p.discovery === 'battle' ? 'Win a battle to discover' : p.discovery === 'expedition' ? 'Explore a region to discover' : p.discovery === 'challenge' ? 'Win a challenge to discover' : 'Research to discover'}</small></span><span class="quantity">${discovered ? '×' + quantity : 'LOCKED'}</span></button>`;
+        return `<button class="part ${selected ? 'selected' : ''} ${!discovered ? 'locked' : ''}" data-action="part" data-part="${p.id}" aria-pressed="${selected}" ${!discovered || (!selected && quantity === 0) ? 'disabled' : ''}><span class="part-icon" aria-hidden="true">${discovered ? { head: '♜', body: '◆', legs: '╳', organ: 'ϟ', armor: '⬡', wings: '⋈' }[p.slot] : '?'}</span><span class="part-copy"><strong>${discovered ? escape(p.name) : 'Unknown component'}</strong><small>${title(p.slot)} · ${discovered ? title(p.element) : p.discovery === 'battle' ? 'Win a battle to discover' : p.discovery === 'expedition' ? 'Explore a region to discover' : p.discovery === 'challenge' ? 'Win a challenge to discover' : p.discovery === 'event' ? 'Complete a seasonal event' : 'Research to discover'}</small></span><span class="quantity">${discovered ? '×' + quantity : 'LOCKED'}</span></button>`;
       })
       .join(
         '',
@@ -515,6 +528,16 @@ export class GameUI {
   }
   private async act(action: string, button: HTMLElement): Promise<void> {
     this.isError = false;
+    if (action === 'event-join') {
+      this.workshop.joinEvent(new Date().toISOString());
+      this.notice = 'Enrolled. New work counts toward this experiment.';
+      this.render();
+    }
+    if (action === 'event-claim') {
+      this.workshop.claimEvent(new Date().toISOString());
+      this.notice = 'Seasonal biology recovered.';
+      this.render();
+    }
     if (action === 'save-blueprint') {
       this.workshop.saveBlueprint(button.dataset.id!);
       this.notice = 'Blueprint saved.';
@@ -567,12 +590,12 @@ export class GameUI {
       this.render();
     }
     if (action === 'market-buy') {
-      this.workshop.buy(button.dataset.id!);
+      this.workshop.buy(button.dataset.id!, new Date().toISOString());
       this.notice = 'Supplies purchased.';
       this.render();
     }
     if (action === 'market-craft') {
-      this.workshop.craft(button.dataset.id!);
+      this.workshop.craft(button.dataset.id!, new Date().toISOString());
       this.notice = 'Biological sample crafted.';
       this.render();
     }
@@ -760,18 +783,24 @@ export class GameUI {
       this.render();
     }
     if (action === 'use-discovery') {
+      const discovery =
+        this.reward?.newComponent ?? this.content.catalog.rules.combat.rewardComponent;
       this.reward = undefined;
       const state = this.workshop.state;
       this.selected = new Set(
-        this.content.catalog.rules.generation.requiredSlots.map(
-          (slot) =>
-            this.content.catalog.components.find(
-              (p) => p.slot === slot && (state.inventory[p.id] ?? 0) > 0,
-            )!.id,
-        ),
+        this.content.catalog.rules.generation.requiredSlots.flatMap((slot) => {
+          const part = this.content.catalog.components.find(
+            (p) => p.slot === slot && (state.inventory[p.id] ?? 0) > 0,
+          );
+          return part ? [part.id] : [];
+        }),
       );
-      const discovery = this.content.catalog.rules.combat.rewardComponent;
-      if ((state.inventory[discovery] ?? 0) > 0) this.selected.add(discovery);
+      if ((state.inventory[discovery] ?? 0) > 0) {
+        const slot = this.content.component(discovery).slot;
+        for (const id of this.selected)
+          if (this.content.component(id).slot === slot) this.selected.delete(id);
+        this.selected.add(discovery);
+      }
       this.nav.go('workshop');
     }
     if (action === 'new-test') {
