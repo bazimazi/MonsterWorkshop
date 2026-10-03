@@ -21,6 +21,7 @@ import { breedingView } from './breeding.js';
 import { explorationView } from './exploration.js';
 import { describeCost, researchView } from './research.js';
 import { costRequirements, hasResearch, mutationConditions } from '../domain/research.js';
+import { currentEvent } from '../domain/events.js';
 import type { BattleReward } from '../application/workshop.js';
 export function downloadSave(raw: string, filename = 'monster-workshop-save.json'): void {
   const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' })),
@@ -66,6 +67,7 @@ export class GameUI {
   private explorerId: string | undefined;
   private lastTick = performance.now();
   private clockFailed = false;
+  private calendarKey: string | null = null;
   private socialCreature: string | undefined;
   private marketOffer: string | undefined;
   private marketRecipe: string | undefined;
@@ -96,7 +98,7 @@ export class GameUI {
         event.preventDefault();
         try {
           this.workshop.importShare(new FormData(form).get('design') as string);
-          this.notice = 'Shared design imported.';
+          this.notify('Shared design imported.');
           this.render();
         } catch (error) {
           this.fail(error);
@@ -107,7 +109,7 @@ export class GameUI {
         try {
           const values = new FormData(form);
           this.workshop.updateProfile(values.get('name') as string, values.get('bio') as string);
-          this.notice = 'Profile saved.';
+          this.notify('Profile saved.');
           this.render();
         } catch (error) {
           this.fail(error);
@@ -117,7 +119,7 @@ export class GameUI {
         event.preventDefault();
         try {
           this.workshop.rename(form.dataset.rename, new FormData(form).get('name') as string);
-          this.notice = 'Name saved.';
+          this.notify('Name saved.');
           this.render();
         } catch (error) {
           this.fail(error);
@@ -131,6 +133,7 @@ export class GameUI {
     );
     document.addEventListener('visibilitychange', () => {
       this.lastTick = performance.now();
+      if (!document.hidden) this.refreshCalendar();
     });
     setInterval(() => this.tick(), 1000);
     this.render();
@@ -139,7 +142,9 @@ export class GameUI {
     const now = performance.now(),
       elapsed = Math.max(0, Math.min(1000, Math.floor(now - this.lastTick)));
     this.lastTick = now;
-    if (document.hidden || this.clockFailed) return;
+    if (document.hidden) return;
+    this.refreshCalendar();
+    if (this.clockFailed) return;
     try {
       this.workshop.advanceExpeditions(elapsed);
       const current = this.workshop.state;
@@ -187,10 +192,69 @@ export class GameUI {
       !matchMedia('(prefers-reduced-motion: reduce)').matches
     );
   }
+  private refreshCalendar(): void {
+    const key = currentEvent(new Date().toISOString(), this.content)?.key ?? null;
+    if (
+      (this.nav.current === 'events' ||
+        this.nav.current === 'market' ||
+        this.nav.current === 'workshop') &&
+      key !== this.calendarKey
+    )
+      this.render();
+  }
+  private resetSession(): void {
+    if (this.timer) clearTimeout(this.timer);
+    const state = this.workshop.state;
+    this.selected = new Set(
+      this.content.catalog.rules.generation.requiredSlots.flatMap((slot) => {
+        const part = this.content.catalog.components.find(
+          (p) =>
+            p.slot === slot &&
+            state.discoveredComponents.includes(p.id) &&
+            (state.inventory[p.id] ?? 0) > 0,
+        );
+        return part ? [part.id] : [];
+      }),
+    );
+    this.sequence = undefined;
+    this.revealId = undefined;
+    this.timer = undefined;
+    this.inspectedId = undefined;
+    this.filter = 'all';
+    this.explorerId = undefined;
+    this.regionId = 'green-meadow';
+    this.scannerId = 'dragon-head';
+    this.controlledMutation = undefined;
+    this.parents = [undefined, undefined];
+    this.socialCreature = undefined;
+    this.marketOffer = undefined;
+    this.marketRecipe = undefined;
+    this.marketCreature = undefined;
+    this.challengeModifier = 'none';
+    this.squad.clear();
+    this.squadInitialized = false;
+    this.reward = undefined;
+    this.selectedAbility = 'strike';
+    this.selectedTarget = undefined;
+    this.lastActor = undefined;
+    this.clockFailed = false;
+    this.lastTick = performance.now();
+  }
+  private prepareSquad(): void {
+    const available = this.workshop.creatures.filter((c) => !this.workshop.isAssigned(c.id));
+    for (const id of this.squad) if (!available.some((c) => c.id === id)) this.squad.delete(id);
+    if (!this.squadInitialized && available.length >= 3) {
+      this.squad = new Set(available.slice(0, 3).map((c) => c.id));
+      this.squadInitialized = true;
+    }
+  }
+  private notify(message: string, isError = false): void {
+    this.notice = message;
+    this.isError = isError;
+  }
   private fail(error: unknown): void {
     logger.error(error);
-    this.notice = error instanceof Error ? error.message : 'Something went wrong';
-    this.isError = true;
+    this.notify(error instanceof Error ? error.message : 'Something went wrong', true);
     this.render();
   }
   private applyOptions(state: PlayerState): void {
@@ -205,6 +269,14 @@ export class GameUI {
     if (!hasResearch(state.completedResearch, 'mutation-control', this.content))
       this.controlledMutation = undefined;
     const screen = this.nav.current;
+    this.calendarKey = currentEvent(new Date().toISOString(), this.content)?.key ?? null;
+    if (!state.activeBattle && (screen === 'battle' || screen === 'challenges'))
+      this.prepareSquad();
+    const ownedIds = new Set(this.workshop.creatures.map((c) => c.id));
+    for (const index of [0, 1] as const) {
+      const id = this.parents[index];
+      if (id && !ownedIds.has(id)) this.parents[index] = undefined;
+    }
     const body =
       screen === 'events'
         ? eventsView(this.workshop, new Date().toISOString())
@@ -249,7 +321,7 @@ export class GameUI {
       ['research', 'Research', '⌕'],
       ['explore', 'Explore', '❧'],
     ];
-    this.root.innerHTML = `<header class="topbar"><a class="brand" href="#workshop"><img src="./icon.svg" alt="" width="36" height="36"><span>MONSTER<span class="brand-light">WORKSHOP</span></span></a><div class="resource"><span class="resource-dot" aria-hidden="true"></span><strong>${state.biomass}</strong><span>biomass</span></div><div class="utility-links"><a class="utility-link" href="#market" aria-label="Marketplace">&#9878;</a><a class="utility-link" href="#journal" aria-label="Journal">&#8801;</a><a class="utility-link" href="#settings" aria-label="Settings">&#9881;</a></div></header><nav class="navigation" aria-label="Main navigation">${tabs.map(([key, label, symbol]) => `<a href="#${key}" ${screen === key ? 'aria-current="page"' : ''}><span aria-hidden="true">${symbol}</span>${label}${key === 'creatures' ? `<small aria-hidden="true">${this.workshop.creatures.length}</small>` : ''}</a>`).join('')}</nav><main class="shell game-shell">${this.notice ? `<div class="notice ${this.isError ? 'error' : ''}" role="${this.isError ? 'alert' : 'status'}">${escape(this.notice)}<button class="quiet" data-action="dismiss" aria-label="Dismiss message">×</button></div>` : ''}${body}</main><footer class="footer">A little science. A little strange. <span>Saved on this device</span></footer>${this.modal()}`;
+    this.root.innerHTML = `<header class="topbar"><a class="brand" href="#workshop"><img src="./icon.svg" alt="" width="36" height="36"><span>MONSTER<span class="brand-light">WORKSHOP</span></span></a><div class="resource"><span class="resource-dot" aria-hidden="true"></span><strong>${state.biomass}</strong><span>biomass</span></div><div class="utility-links"><a class="utility-link" href="#market" aria-label="Marketplace">&#9878;</a><a class="utility-link" href="#journal" aria-label="Journal">&#8801;</a><a class="utility-link" href="#settings" aria-label="Settings">&#9881;</a></div></header><nav class="navigation" aria-label="Main navigation">${tabs.map(([key, label, symbol]) => `<a href="#${key}" ${screen === key ? 'aria-current="page"' : ''}><span aria-hidden="true">${symbol}</span>${label}${key === 'creatures' ? `<small aria-hidden="true">${this.workshop.creatures.length}</small>` : ''}</a>`).join('')}</nav><main class="shell game-shell">${this.notice ? `<div class="notice ${this.isError ? 'error' : ''}" role="${this.isError ? 'alert' : 'status'}">${escape(this.notice)}<button class="quiet" data-action="dismiss" aria-label="Dismiss message">×</button></div>` : ''}${this.clockFailed ? '<section class="notice clock-recovery" role="status"><p>Expeditions and parent recovery are paused until this browser can save.</p><button class="secondary" data-action="retry-clock">Resume active timers</button></section>' : ''}${body}</main><footer class="footer">A little science. A little strange. <span>Saved on this device</span></footer>${this.modal()}`;
     const dialog = this.root.querySelector<HTMLDialogElement>('dialog');
     if (dialog) {
       dialog.showModal();
@@ -429,18 +501,6 @@ export class GameUI {
     const battle = state.activeBattle;
     if (!battle) {
       const creatures = this.workshop.creatures;
-      if (!this.squadInitialized && creatures.length >= 3) {
-        this.squad = new Set(
-          creatures
-            .filter((c) => !this.workshop.isAssigned(c.id))
-            .slice(0, 3)
-            .map((c) => c.id),
-        );
-        this.squadInitialized = true;
-      }
-      for (const id of this.squad)
-        if (!creatures.some((c) => c.id === id) || this.workshop.isAssigned(id))
-          this.squad.delete(id);
       return `${heading}<section class="panel"><div class="section-title"><h2>Choose your field team</h2><span class="tag">${this.squad.size} / 3 SELECTED</span></div><p class="muted">${creatures.length < 3 ? 'Manufacture three creatures to begin. Every team member must be your own invention.' : 'Mix armor, speed and elemental power. Tap a specimen to change the squad.'}</p>${creatures.length ? `<div class="creature-grid squad-grid">${creatures.map((c) => `<button class="panel creature-card ${this.squad.has(c.id) ? 'squad-selected' : ''}" data-action="squad" data-id="${escape(c.id)}" aria-pressed="${this.squad.has(c.id)}" ${this.workshop.isAssigned(c.id) ? 'disabled' : ''}>${renderCreature(c, this.content, false)}<strong>${escape(c.name)}</strong><span class="card-meta">${title(c.element)} · ${c.stats.hp} HP · ${c.stats.speed} speed</span><span class="tag">${this.squad.has(c.id) ? '✓ SELECTED' : 'ADD TO SQUAD'}</span></button>`).join('')}</div>` : '<div class="empty"><p>Your first team is waiting to be built.</p><a class="primary" href="#workshop">Return to the workshop</a></div>'}<div class="battle-start"><p class="micro">Victory earns biomass, components and a new discovery. Defeated creatures recover. No entry cost.</p><button class="primary" data-action="start-battle" ${this.squad.size !== 3 ? 'disabled' : ''}>Start field test</button></div></section>`;
     }
     const actor = currentActor(battle);
@@ -527,20 +587,26 @@ export class GameUI {
     }, 450);
   }
   private async act(action: string, button: HTMLElement): Promise<void> {
-    this.isError = false;
+    if (action === 'retry-clock') {
+      this.workshop.retrySave();
+      this.clockFailed = false;
+      this.lastTick = performance.now();
+      this.notify('Active timers resumed.');
+      this.render();
+    }
     if (action === 'event-join') {
       this.workshop.joinEvent(new Date().toISOString());
-      this.notice = 'Enrolled. New work counts toward this experiment.';
+      this.notify('Enrolled. New work counts toward this experiment.');
       this.render();
     }
     if (action === 'event-claim') {
       this.workshop.claimEvent(new Date().toISOString());
-      this.notice = 'Seasonal biology recovered.';
+      this.notify('Seasonal biology recovered.');
       this.render();
     }
     if (action === 'save-blueprint') {
       this.workshop.saveBlueprint(button.dataset.id!);
-      this.notice = 'Blueprint saved.';
+      this.notify('Blueprint saved.');
       this.render();
     }
     if (action === 'showcase-toggle') {
@@ -549,7 +615,7 @@ export class GameUI {
     }
     if (action === 'visitor-blueprint') {
       this.workshop.saveVisitorBlueprint(button.dataset.id!);
-      this.notice = 'Visitor recipe saved.';
+      this.notify('Visitor recipe saved.');
       this.render();
     }
     if (action === 'share-creature')
@@ -568,10 +634,10 @@ export class GameUI {
       const raw = this.workshop.exportBlueprint(button.dataset.id!);
       if (!navigator.clipboard) {
         downloadSave(raw, 'monster-workshop-blueprint.json');
-        this.notice = 'Blueprint exported.';
+        this.notify('Blueprint exported.');
       } else {
         await navigator.clipboard.writeText(raw);
-        this.notice = 'Genetic blueprint copied.';
+        this.notify('Genetic blueprint copied.');
       }
       this.render();
     }
@@ -591,18 +657,18 @@ export class GameUI {
     }
     if (action === 'market-buy') {
       this.workshop.buy(button.dataset.id!, new Date().toISOString());
-      this.notice = 'Supplies purchased.';
+      this.notify('Supplies purchased.');
       this.render();
     }
     if (action === 'market-craft') {
       this.workshop.craft(button.dataset.id!, new Date().toISOString());
-      this.notice = 'Biological sample crafted.';
+      this.notify('Biological sample crafted.');
       this.render();
     }
     if (action === 'market-sell' || action === 'market-deliver') {
       const sale = this.workshop.sell(button.dataset.id!, action === 'market-deliver');
       this.squad.delete(sale.creatureId);
-      this.notice = `Creature transferred. +${sale.biomass} biomass.`;
+      this.notify(`Creature transferred. +${sale.biomass} biomass.`);
       this.render();
     }
     if (action === 'part') {
@@ -615,7 +681,7 @@ export class GameUI {
         this.selected.add(id);
       }
       this.feedback.play('select');
-      this.notice = '';
+      this.notify('');
       this.render(id);
     }
     if (action === 'manufacture' && !this.sequence && !this.revealId) {
@@ -626,7 +692,7 @@ export class GameUI {
       );
       this.inspectedId = creature.id;
       this.feedback.play('create');
-      this.notice = '';
+      this.notify('');
       if (this.animated()) {
         this.sequence = { id: creature.id, step: 0 };
         this.render();
@@ -657,12 +723,12 @@ export class GameUI {
       );
       this.inspectedId = child.id;
       this.revealId = child.id;
-      this.notice = 'An offspring has joined your family.';
+      this.notify('An offspring has joined your family.');
       this.render();
     }
     if (action === 'research') {
       this.workshop.completeResearch(button.dataset.id!);
-      this.notice = `${this.content.research.get(button.dataset.id!)!.name} researched.`;
+      this.notify(`${this.content.research.get(button.dataset.id!)!.name} researched.`);
       this.render();
     }
     if (action === 'open-scanner') {
@@ -673,13 +739,15 @@ export class GameUI {
     }
     if (action === 'scan') {
       this.workshop.scanComponent(button.dataset.id!, new Date().toISOString());
-      this.notice = 'Biological analysis saved.';
+      this.notify('Biological analysis saved.');
       this.render();
       this.root.querySelector('#component-scanner')?.scrollIntoView({ block: 'start' });
     }
     if (action === 'cultivate') {
       this.workshop.cultivateComponent(button.dataset.id!);
-      this.notice = `${this.content.component(button.dataset.id!).name} cultivated. One sample added to storage.`;
+      this.notify(
+        `${this.content.component(button.dataset.id!).name} cultivated. One sample added to storage.`,
+      );
       this.render();
     }
     if (action === 'region') {
@@ -691,30 +759,31 @@ export class GameUI {
       this.workshop.startExpedition(this.regionId, this.explorerId, new Date().toISOString());
       this.lastTick = performance.now();
       this.explorerId = undefined;
-      this.notice = 'Your explorer is on its way.';
+      this.notify('Your explorer is on its way.');
       this.render();
     }
     if (action === 'claim-expedition') {
       const reward = this.workshop.claimExpedition(button.dataset.id!);
-      this.notice = `Expedition collected: +${reward.biomass} biomass${reward.discovery ? ' / Recovered ' + this.content.component(reward.discovery).name : ''}.`;
+      this.notify(
+        `Expedition collected: +${reward.biomass} biomass${reward.discovery ? ' / Recovered ' + this.content.component(reward.discovery).name : ''}.`,
+      );
       this.feedback.play('victory');
       this.render();
     }
     if (action === 'cancel-expedition') {
       this.workshop.cancelExpedition(button.dataset.id!);
-      this.notice = 'Your explorer returned safely.';
+      this.notify('Your explorer returned safely.');
       this.render();
     }
     if (action === 'export') downloadSave(this.workshop.exportSave());
     if (action === 'backup') {
       this.workshop.restoreBackup();
-      this.reward = undefined;
-      this.lastActor = undefined;
-      this.notice = 'Previous save restored.';
+      this.resetSession();
+      this.notify('Previous save restored.');
       this.render();
     }
     if (action === 'dismiss') {
-      this.notice = '';
+      this.notify('');
       this.render();
     }
     if (action === 'squad') {
@@ -722,18 +791,11 @@ export class GameUI {
       if (this.squad.has(id)) this.squad.delete(id);
       else if (this.squad.size < 3) this.squad.add(id);
       else {
-        this.notice = 'Remove one team member before adding another.';
+        this.notify('Remove one team member before adding another.');
       }
       this.render();
     }
     if (action === 'start-tower' || action === 'start-boss') {
-      if (!this.squad.size)
-        this.squad = new Set(
-          this.workshop.creatures
-            .filter((c) => !this.workshop.isAssigned(c.id))
-            .slice(0, 3)
-            .map((c) => c.id),
-        );
       this.workshop.startBattle(
         [...this.squad],
         new Date().toISOString(),
@@ -749,7 +811,7 @@ export class GameUI {
       this.workshop.startBattle([...this.squad], new Date().toISOString());
       this.lastActor = undefined;
       this.selectedTarget = undefined;
-      this.notice = '';
+      this.notify('');
       this.render();
     }
     if (action === 'ability') {
@@ -817,7 +879,7 @@ export class GameUI {
       const file = input.files?.[0];
       if (file) {
         this.workshop.importShare(await file.text());
-        this.notice = 'Shared design imported.';
+        this.notify('Shared design imported.');
         this.render();
       }
     }
@@ -870,20 +932,8 @@ export class GameUI {
       if (!file) return;
       if (file.size > 1_000_000) throw new Error('Save file is too large');
       this.workshop.importSave(await file.text());
-      this.selected = new Set(
-        this.content.catalog.rules.generation.requiredSlots.map(
-          (slot) => this.content.catalog.components.find((p) => p.slot === slot)!.id,
-        ),
-      );
-      this.inspectedId = undefined;
-      this.explorerId = undefined;
-      this.controlledMutation = undefined;
-      this.lastTick = performance.now();
-      this.reward = undefined;
-      this.squadInitialized = false;
-      this.squad.clear();
-      this.notice = 'Workshop imported.';
-      this.isError = false;
+      this.resetSession();
+      this.notify('Workshop imported.');
       this.render();
     }
   }

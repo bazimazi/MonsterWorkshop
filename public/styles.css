@@ -543,6 +543,18 @@ summary {
   padding: 0 10px;
   font-size: 1.3rem;
 }
+.clock-recovery {
+  flex-wrap: wrap;
+  padding: 14px;
+}
+.clock-recovery p {
+  flex: 1 1 16rem;
+  margin: 0;
+}
+.clock-recovery button {
+  padding: 10px 14px;
+  font-size: 0.9rem;
+}
 .creature-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

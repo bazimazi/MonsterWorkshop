@@ -66,4 +66,6 @@ npm run lab -- blueprint monster-workshop-blueprint.json
 npm run lab -- generate 17 dragon-head wolf-body frost-organ storm-wings --mutation=storm-frost
 ```
 
-The force example uses the developer tool's October 2, 2026 timestamp, inside Aurora Lab. Runtime seasonal creation uses the actual calendar window. Final automated coverage: 76 unit tests plus 32 phone/desktop browser scenarios.
+The force example uses the developer tool's October 2, 2026 timestamp, inside Aurora Lab. Runtime seasonal creation uses the actual calendar window. Current automated coverage: 76 unit tests plus 42 phone/desktop browser scenarios.
+
+If browser storage prevents a timer save, expeditions and parent recovery pause visibly. Free storage, then use **Resume active timers** to retry saving. A failed retry keeps progress paused; a successful retry resumes future foreground progress without catch-up. Importing or restoring a valid workshop also resets timer failures and clears previous specimen, parent and squad selections. Calendar and seasonal supply screens refresh across weekly boundaries while open.

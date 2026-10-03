@@ -618,6 +618,9 @@ export class Workshop {
   exportSave(): string {
     return this.saves.export();
   }
+  retrySave(): void {
+    this.saves.write(this.value);
+  }
   importSave(raw: string): void {
     this.value = this.saves.import(raw);
   }
