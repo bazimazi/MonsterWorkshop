@@ -34,6 +34,14 @@ import { breedCreature } from '../domain/breeding.js';
 import type { Challenge } from '../domain/challenges.js';
 import { orderAt, orderRequirements, salePrice } from '../domain/economy.js';
 import type { Sale } from '../domain/economy.js';
+import {
+  blueprintId,
+  decodeProfile,
+  decodeShare,
+  encodeShare,
+  galleryId,
+} from '../domain/sharing.js';
+import type { Blueprint, Profile } from '../domain/sharing.js';
 export interface BattleReward {
   victory: boolean;
   biomass: number;
@@ -64,6 +72,121 @@ export class Workshop {
   }
   get orderSerial(): number {
     return this.value.sales.filter((sale) => sale.orderSerial !== null).length + 1;
+  }
+  get profile(): Profile {
+    return { name: this.value.playerName, bio: this.value.biography };
+  }
+  updateProfile(name: string, bio: string): void {
+    const profile = decodeProfile({ name, bio });
+    this.transact((next) => {
+      next.playerName = profile.name;
+      next.biography = profile.bio;
+    });
+  }
+  toggleShowcase(id: string): void {
+    if (!this.creatures.some((c) => c.id === id)) throw new DomainError('Choose an owned specimen');
+    this.transact((next) => {
+      if (next.showcase.includes(id)) next.showcase = next.showcase.filter((x) => x !== id);
+      else {
+        if (next.showcase.length >= 3) throw new DomainError('Showcase up to three specimens');
+        next.showcase.push(id);
+      }
+    });
+  }
+  saveBlueprint(id: string): Blueprint {
+    const c = this.creatures.find((c) => c.id === id);
+    if (!c) throw new DomainError('Choose an owned specimen');
+    const source = {
+      name: c.name,
+      author: c.creator,
+      componentIds: c.componentIds,
+      controlledMutation: this.value.experiments.find((e) => e.creatureId === id)!
+        .controlledMutation,
+    };
+    const blueprint = { id: blueprintId(source), ...source };
+    this.transact((next) => {
+      if (next.blueprints.some((b) => b.id === blueprint.id))
+        throw new DomainError('Blueprint already saved');
+      next.blueprints.push(blueprint);
+    });
+    return structuredClone(blueprint);
+  }
+  manufactureBlueprint(id: string, at: string): Creature {
+    const b = this.value.blueprints.find((b) => b.id === id);
+    if (!b) throw new DomainError('Unknown saved blueprint');
+    return this.manufacture(b.componentIds, at, b.controlledMutation ?? undefined);
+  }
+  saveVisitorBlueprint(id: string): void {
+    const g = this.value.gallery.find((g) => g.id === id);
+    if (!g) throw new DomainError('Unknown visiting specimen');
+    const recipe = {
+      name: g.source.name,
+      author: g.source.creator,
+      componentIds: g.source.componentIds,
+      controlledMutation: null,
+    };
+    const b = { id: blueprintId(recipe), ...recipe };
+    this.transact((next) => {
+      if (next.blueprints.some((x) => x.id === b.id))
+        throw new DomainError('Blueprint already saved');
+      next.blueprints.push(b);
+    });
+  }
+  exportCreature(id: string): string {
+    const c = this.creatures.find((c) => c.id === id);
+    if (!c) throw new DomainError('Choose an owned specimen');
+    return encodeShare(
+      { kind: 'creature', profile: this.profile, creatures: [decodeCreature(c, this.content)] },
+      this.content,
+    );
+  }
+  exportBlueprint(id: string): string {
+    const b = this.value.blueprints.find((b) => b.id === id);
+    if (!b) throw new DomainError('Unknown saved blueprint');
+    return encodeShare({ kind: 'blueprint', blueprint: b }, this.content);
+  }
+  exportShowcase(): string {
+    if (!this.value.showcase.length) throw new DomainError('Add a creature to your showcase first');
+    return encodeShare(
+      {
+        kind: 'showcase',
+        profile: this.profile,
+        creatures: this.value.showcase.map((id) =>
+          decodeCreature(this.creatures.find((c) => c.id === id)!, this.content),
+        ),
+      },
+      this.content,
+    );
+  }
+  importShare(raw: string): void {
+    const share = decodeShare(raw, this.content);
+    this.transact((next) => {
+      if (share.kind === 'blueprint') {
+        if (next.blueprints.some((b) => b.id === share.blueprint.id))
+          throw new DomainError('Blueprint already in your library');
+        next.blueprints.push(share.blueprint);
+      } else {
+        let added = 0;
+        for (const source of share.creatures) {
+          const id = galleryId(source);
+          if (!next.gallery.some((g) => g.id === id)) {
+            next.gallery.push({ id, source, profile: share.profile });
+            added++;
+          }
+        }
+        if (!added) throw new DomainError('These specimens are already in your gallery');
+      }
+    });
+  }
+  removeBlueprint(id: string): void {
+    this.transact((next) => {
+      next.blueprints = next.blueprints.filter((b) => b.id !== id);
+    });
+  }
+  removeGallery(id: string): void {
+    this.transact((next) => {
+      next.gallery = next.gallery.filter((g) => g.id !== id);
+    });
   }
   buy(id: string): void {
     const offer = this.content.catalog.economy.offers.find((o) => o.id === id);
@@ -108,6 +231,7 @@ export class Workshop {
       for (const [id, n] of Object.entries(sale.resources))
         next.resources[id] = (next.resources[id] ?? 0) + n;
       next.sales.push(sale);
+      next.showcase = next.showcase.filter((x) => x !== id);
     });
     this.analytics.track(deliver ? 'order_delivered' : 'creature_sold', { biomass: sale.biomass });
     return sale;

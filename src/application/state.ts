@@ -28,6 +28,8 @@ import { breedCreature } from '../domain/breeding.js';
 import type { Birth } from '../domain/breeding.js';
 import { orderAt, orderRequirements, salePrice } from '../domain/economy.js';
 import type { Sale } from '../domain/economy.js';
+import { decodeBlueprint, decodeGallery } from '../domain/sharing.js';
+import type { Blueprint, GalleryEntry } from '../domain/sharing.js';
 export interface Options {
   sound: boolean;
   haptics: boolean;
@@ -70,6 +72,10 @@ export interface PlayerState {
   towerFloor: number;
   bossVictories: string[];
   sales: Sale[];
+  biography: string;
+  showcase: string[];
+  blueprints: Blueprint[];
+  gallery: GalleryEntry[];
 }
 export function initialState(content: ContentIndex, seed: number): PlayerState {
   const starter = content.catalog.components.filter((p) => p.discovery === 'starter');
@@ -101,6 +107,10 @@ export function initialState(content: ContentIndex, seed: number): PlayerState {
     towerFloor: 1,
     bossVictories: [],
     sales: [],
+    biography: 'Curious creature engineer.',
+    showcase: [],
+    blueprints: [],
+    gallery: [],
   };
 }
 export function decodeOptions(value: unknown): Options {
@@ -202,6 +212,24 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
         throw new DomainError('Invalid request progression');
       const sold = new Set(sales.map((sale) => sale.creatureId));
       const habitat = creatures.filter((c) => !sold.has(c.id));
+      const biography = string(s.biography ?? 'Curious creature engineer.', 'biography', 240);
+      const showcase = strings(s.showcase ?? [], 'showcase', 3);
+      unique(showcase, 'showcase specimens');
+      for (const id of showcase)
+        if (!habitat.some((c) => c.id === id))
+          throw new DomainError('Showcase contains an unavailable creature');
+      const blueprints = list(s.blueprints ?? [], 'blueprints', 50).map((b) =>
+        decodeBlueprint(b, content),
+      );
+      unique(
+        blueprints.map((b) => b.id),
+        'blueprints',
+      );
+      const gallery = list(s.gallery ?? [], 'gallery', 100).map((g) => decodeGallery(g, content));
+      unique(
+        gallery.map((g) => g.id),
+        'gallery',
+      );
       if (
         habitat.length > content.catalog.rules.workshop.maxCreatures ||
         (creatures.length && !habitat.length)
@@ -492,6 +520,10 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
         towerFloor,
         bossVictories,
         sales,
+        biography,
+        showcase,
+        blueprints,
+        gallery,
       }) as PlayerState;
     },
   };

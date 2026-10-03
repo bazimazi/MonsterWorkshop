@@ -12,6 +12,7 @@ import { escape, title } from './html.js';
 import { availableAbilities, canUse, currentActor } from '../domain/combat.js';
 import type { Battle, Combatant } from '../domain/combat.js';
 import { deriveCreature } from '../domain/generator.js';
+import { socialView } from './social.js';
 import { marketView } from './market.js';
 import { challengesView } from './challenges.js';
 import type { Challenge } from '../domain/challenges.js';
@@ -20,11 +21,11 @@ import { explorationView } from './exploration.js';
 import { describeCost, researchView } from './research.js';
 import { costRequirements, hasResearch, mutationConditions } from '../domain/research.js';
 import type { BattleReward } from '../application/workshop.js';
-export function downloadSave(raw: string): void {
+export function downloadSave(raw: string, filename = 'monster-workshop-save.json'): void {
   const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' })),
     link = document.createElement('a');
   link.href = url;
-  link.download = 'monster-workshop-save.json';
+  link.download = filename;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
@@ -64,6 +65,7 @@ export class GameUI {
   private explorerId: string | undefined;
   private lastTick = performance.now();
   private clockFailed = false;
+  private socialCreature: string | undefined;
   private marketOffer: string | undefined;
   private marketRecipe: string | undefined;
   private marketCreature: string | undefined;
@@ -89,6 +91,27 @@ export class GameUI {
     });
     root.addEventListener('submit', (event) => {
       const form = event.target as HTMLFormElement;
+      if (form.dataset.sharePaste) {
+        event.preventDefault();
+        try {
+          this.workshop.importShare(new FormData(form).get('design') as string);
+          this.notice = 'Shared design imported.';
+          this.render();
+        } catch (error) {
+          this.fail(error);
+        }
+      }
+      if (form.dataset.profile) {
+        event.preventDefault();
+        try {
+          const values = new FormData(form);
+          this.workshop.updateProfile(values.get('name') as string, values.get('bio') as string);
+          this.notice = 'Profile saved.';
+          this.render();
+        } catch (error) {
+          this.fail(error);
+        }
+      }
       if (form.dataset.rename) {
         event.preventDefault();
         try {
@@ -182,38 +205,40 @@ export class GameUI {
       this.controlledMutation = undefined;
     const screen = this.nav.current;
     const body =
-      screen === 'market'
-        ? marketView(this.workshop, this.marketOffer, this.marketRecipe, this.marketCreature)
-        : screen === 'challenges'
-          ? challengesView(this.workshop, [...this.squad], this.challengeModifier)
-          : screen === 'breeding'
-            ? breedingView(this.workshop, ...this.parents)
-            : screen === 'research'
-              ? researchView(
-                  state,
-                  this.workshop,
-                  this.content,
-                  state.discoveredComponents.includes(this.scannerId)
-                    ? this.scannerId
-                    : state.discoveredComponents[0]!,
-                )
-              : screen === 'explore'
-                ? explorationView(
+      screen === 'social'
+        ? socialView(this.workshop, this.socialCreature)
+        : screen === 'market'
+          ? marketView(this.workshop, this.marketOffer, this.marketRecipe, this.marketCreature)
+          : screen === 'challenges'
+            ? challengesView(this.workshop, [...this.squad], this.challengeModifier)
+            : screen === 'breeding'
+              ? breedingView(this.workshop, ...this.parents)
+              : screen === 'research'
+                ? researchView(
                     state,
                     this.workshop,
                     this.content,
-                    this.regionId,
-                    this.explorerId,
+                    state.discoveredComponents.includes(this.scannerId)
+                      ? this.scannerId
+                      : state.discoveredComponents[0]!,
                   )
-                : screen === 'creatures'
-                  ? this.creaturesView(state)
-                  : screen === 'battle'
-                    ? this.battleView(state)
-                    : screen === 'journal'
-                      ? this.journalView(state)
-                      : screen === 'settings'
-                        ? this.settingsView(state)
-                        : this.workshopView(state);
+                : screen === 'explore'
+                  ? explorationView(
+                      state,
+                      this.workshop,
+                      this.content,
+                      this.regionId,
+                      this.explorerId,
+                    )
+                  : screen === 'creatures'
+                    ? this.creaturesView(state)
+                    : screen === 'battle'
+                      ? this.battleView(state)
+                      : screen === 'journal'
+                        ? this.journalView(state)
+                        : screen === 'settings'
+                          ? this.settingsView(state)
+                          : this.workshopView(state);
     const tabs: [Screen, string, string][] = [
       ['workshop', 'Workshop', '⚗'],
       ['creatures', 'Creatures', '◈'],
@@ -325,7 +350,7 @@ export class GameUI {
     const all = this.workshop.creatures,
       creatures = all.filter((c) => this.filter !== 'mutated' || c.mutationIds.length > 0);
     const selected = all.find((c) => c.id === this.inspectedId);
-    return `<div class="page-heading"><div><p class="eyebrow">YOUR LIVING INVENTIONS</p><a class="secondary" href="#breeding">Breeding nursery</a><h1 tabindex="-1">The habitat</h1><p class="muted">${this.workshop.creatures.length} / ${this.content.catalog.rules.workshop.maxCreatures} specimens · Made by you.</p></div><label class="filter-label">Show <select data-filter="true" aria-label="Filter creatures"><option value="all" ${this.filter === 'all' ? 'selected' : ''}>All creatures</option><option value="mutated" ${this.filter === 'mutated' ? 'selected' : ''}>Mutated creatures</option></select></label></div>${!all.length ? '<section class="panel empty"><h2>Your first invention belongs here.</h2><p class="muted">Build something curious in the creation chamber.</p><a class="primary" href="#workshop">Start an experiment</a></section>' : `<div class="creature-grid">${creatures.map((c) => `<button class="panel creature-card" data-action="inspect" data-id="${escape(c.id)}">${renderCreature(c, this.content, false)}<strong>${escape(c.name)}</strong><span class="card-meta">${title(c.element)} · ${title(c.quality)} · Lv ${c.level}</span><span class="tag ${c.mutationIds.length ? 'gold' : ''}">${c.mutationIds.length ? '✦ MUTATED' : c.roles.map(title).join(' / ')}</span></button>`).join('')}</div>${!creatures.length ? '<p class="muted">No mutations discovered yet. Try an electric component.</p>' : ''}`}${
+    return `<div class="page-heading"><div><p class="eyebrow">YOUR LIVING INVENTIONS</p><a class="secondary" href="#social">Showcase & blueprints</a><a class="secondary" href="#breeding">Breeding nursery</a><h1 tabindex="-1">The habitat</h1><p class="muted">${this.workshop.creatures.length} / ${this.content.catalog.rules.workshop.maxCreatures} specimens · Made by you.</p></div><label class="filter-label">Show <select data-filter="true" aria-label="Filter creatures"><option value="all" ${this.filter === 'all' ? 'selected' : ''}>All creatures</option><option value="mutated" ${this.filter === 'mutated' ? 'selected' : ''}>Mutated creatures</option></select></label></div>${!all.length ? '<section class="panel empty"><h2>Your first invention belongs here.</h2><p class="muted">Build something curious in the creation chamber.</p><a class="primary" href="#workshop">Start an experiment</a></section>' : `<div class="creature-grid">${creatures.map((c) => `<button class="panel creature-card" data-action="inspect" data-id="${escape(c.id)}">${renderCreature(c, this.content, false)}<strong>${escape(c.name)}</strong><span class="card-meta">${title(c.element)} · ${title(c.quality)} · Lv ${c.level}</span><span class="tag ${c.mutationIds.length ? 'gold' : ''}">${c.mutationIds.length ? '✦ MUTATED' : c.roles.map(title).join(' / ')}</span></button>`).join('')}</div>${!creatures.length ? '<p class="muted">No mutations discovered yet. Try an electric component.</p>' : ''}`}${
       selected
         ? `<section class="panel specimen-detail" id="specimen-detail"><div class="section-title"><h2>${escape(selected.name)}</h2><span class="tag">SPECIMEN ${escape(selected.id)}</span></div>${this.stats(selected)}<form data-rename="${escape(selected.id)}" class="rename-form"><label>Name your creation<input name="name" maxlength="40" required value="${escape(selected.name)}"></label><button class="secondary" type="submit">Save name</button></form><div class="detail-grid"><div><h3>Genome</h3>${GENES.map((id) => `<div class="gene-row"><span>${title(id)}</span><meter min="0" max="100" value="${selected.genome[id].value}" aria-label="${id}"></meter><strong>${selected.genome[id].value}</strong></div>`).join('')}</div><div><h3>Abilities</h3>${selected.abilityIds
             .map((id) => {
@@ -490,6 +515,57 @@ export class GameUI {
   }
   private async act(action: string, button: HTMLElement): Promise<void> {
     this.isError = false;
+    if (action === 'save-blueprint') {
+      this.workshop.saveBlueprint(button.dataset.id!);
+      this.notice = 'Blueprint saved.';
+      this.render();
+    }
+    if (action === 'showcase-toggle') {
+      this.workshop.toggleShowcase(button.dataset.id!);
+      this.render();
+    }
+    if (action === 'visitor-blueprint') {
+      this.workshop.saveVisitorBlueprint(button.dataset.id!);
+      this.notice = 'Visitor recipe saved.';
+      this.render();
+    }
+    if (action === 'share-creature')
+      downloadSave(
+        this.workshop.exportCreature(button.dataset.id!),
+        'monster-workshop-creature.json',
+      );
+    if (action === 'share-blueprint')
+      downloadSave(
+        this.workshop.exportBlueprint(button.dataset.id!),
+        'monster-workshop-blueprint.json',
+      );
+    if (action === 'share-showcase')
+      downloadSave(this.workshop.exportShowcase(), 'monster-workshop-showcase.json');
+    if (action === 'copy-blueprint') {
+      const raw = this.workshop.exportBlueprint(button.dataset.id!);
+      if (!navigator.clipboard) {
+        downloadSave(raw, 'monster-workshop-blueprint.json');
+        this.notice = 'Blueprint exported.';
+      } else {
+        await navigator.clipboard.writeText(raw);
+        this.notice = 'Genetic blueprint copied.';
+      }
+      this.render();
+    }
+    if (action === 'remove-blueprint') {
+      this.workshop.removeBlueprint(button.dataset.id!);
+      this.render();
+    }
+    if (action === 'remove-gallery') {
+      this.workshop.removeGallery(button.dataset.id!);
+      this.render();
+    }
+    if (action === 'make-blueprint') {
+      const c = this.workshop.manufactureBlueprint(button.dataset.id!, new Date().toISOString());
+      this.inspectedId = c.id;
+      this.revealId = c.id;
+      this.render();
+    }
     if (action === 'market-buy') {
       this.workshop.buy(button.dataset.id!);
       this.notice = 'Supplies purchased.';
@@ -704,6 +780,18 @@ export class GameUI {
     }
   }
   private async change(input: HTMLInputElement): Promise<void> {
+    if (input.dataset.socialCreature) {
+      this.socialCreature = input.value;
+      this.render();
+    }
+    if (input.dataset.shareImport) {
+      const file = input.files?.[0];
+      if (file) {
+        this.workshop.importShare(await file.text());
+        this.notice = 'Shared design imported.';
+        this.render();
+      }
+    }
     if (input.dataset.marketOffer) {
       this.marketOffer = input.value;
       this.render();

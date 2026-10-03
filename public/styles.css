@@ -1571,3 +1571,35 @@ select {
     padding: 20px;
   }
 }
+
+.secondary-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+textarea {
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  background: #101222;
+  border: 1px solid #353953;
+  border-radius: 12px;
+  padding: 12px;
+  resize: vertical;
+}
+summary {
+  cursor: pointer;
+  padding: 12px 0;
+}
+
+.visiting-gallery {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+}
+.visiting-gallery .stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.visiting-gallery .stats dd .micro {
+  display: block;
+  font-size: 0.7rem;
+}

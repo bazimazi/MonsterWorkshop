@@ -1,5 +1,41 @@
 import { test, expect } from '@playwright/test';
 import { fullResearchWorkshop } from '../helpers/research-workshop.mjs';
+test('profile, showcase and blueprint files roundtrip without granting visiting creature ownership', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Manufacture', exact: false }).click();
+  if (await page.getByRole('button', { name: 'Skip sequence' }).count())
+    await page.getByRole('button', { name: 'Skip sequence' }).click();
+  await page.getByRole('button', { name: 'Meet your creature' }).click();
+  await page.getByRole('link', { name: 'Showcase & blueprints', exact: true }).click();
+  await page.getByLabel('Engineer name', { exact: true }).fill('Aster');
+  await page.getByLabel('Biography', { exact: true }).fill('Collector of strange ideas.');
+  await page.getByRole('button', { name: 'Save profile' }).click();
+  await page.getByRole('button', { name: 'Add to showcase' }).click();
+  await page.getByRole('button', { name: 'Save blueprint', exact: true }).click();
+  const exported = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export showcase' }).click();
+  const download = await exported;
+  await page
+    .getByLabel('Import shared design', { exact: true })
+    .setInputFiles(await download.path());
+  await expect(page.getByText('VISITING SPECIMEN', { exact: true })).toBeVisible();
+  await page.getByText('Inspect genome & recipe', { exact: true }).click();
+  await page.screenshot({
+    path: `artifacts/social-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+  await page.getByRole('button', { name: 'Manufacture blueprint' }).click();
+  await page.getByRole('button', { name: 'Keep experimenting' }).click();
+  await page.reload();
+  await expect(page.getByText('VISITING SPECIMEN', { exact: true })).toBeVisible();
+  expect(
+    (await page.evaluate(() => JSON.parse(localStorage.getItem('monster-workshop.save')).data))
+      .creatures,
+  ).toHaveLength(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
 test('market purchases and crafting persist; NPC delivery frees habitat and keeps journal', async ({
   page,
 }) => {
