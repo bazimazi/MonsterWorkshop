@@ -22,4 +22,13 @@ Before visual caching, 2,000 local Node samples averaged 0.0344ms per generation
 
 Strict compilation and automated domain, property, transaction, browser and offline tests pass. Mutation frequencies are checked over 4,000 rolls. One-time reward claims, failed-write rollback, illegal battle actions, battle resumption, corrupted saves and malformed imports are tested. Save rollback/manual editing cannot be prevented by a local single-player client. Multiplayer, online transactions, payments and server authority are absent. The deliverable is a playable 2D browser slice, not a native-store release or the entire long-term game.
 
-The architecture, gameplay, UX, performance and content reviews identified no remaining blocker to testing the first slice. Human playtesting is the next gate before Phases 6–12.
+The architecture, gameplay, UX, performance and content reviews identified no remaining blocker to testing the first slice. The user subsequently requested continuation; the expansion review below covers phases 6 and 7.
+
+
+## Exploration and research expansion review
+
+The implementation now gives creatures gathering, mining and scouting uses, with tags, adaptation and speed determining fitness. A new player can reach all three biomes through existing manufacturing and combat rewards. First region visits guarantee component discoveries, while later visits replenish materials and roll seeded drops. Region requirements make new anatomy useful beyond combat. Active timers pause when hidden or closed and preserve bounded progress on reload; saved wall timestamps never generate rewards.
+
+The six-node research tree is reachable using actual gameplay actions. It consumes expedition resources and requires experiments, scans, biome completions and an observed mutation. Scanning adds progressively revealed information, and cultivation makes research components renewable. Guided manufacturing has an explicit cost and eligibility rule. Existing creature sources and natural generation are unchanged. Research and exploration mutations remain transactional, including save failure. Browser coverage now contains 22 phone/desktop scenarios; unit coverage contains 57 tests.
+
+Research screens, progressive scanner results and new creature anatomy were visually inspected. Main navigation remains five destinations, with Journal and Settings available in the header. Full-screen mobile research has substantial scrolling; the scanner shortcut provides direct access. Native device performance, screen-reader behavior and human enjoyment still require playtests. Phase 8's breeding gate explicitly requires a fun creation loop; no human feedback has been supplied yet. Phases 8 through 12 remain unimplemented.

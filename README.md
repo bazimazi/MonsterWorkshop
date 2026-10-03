@@ -15,6 +15,6 @@ Open http://127.0.0.1:4173. After changing source, run `npm run build` and reloa
 
 Install Chromium once for browser tests: `npx playwright install chromium`.
 
-The game includes five starter components, deterministic genetics and mutations, modular creature visuals, transactional manufacturing, collection/journal, 3v3 tactical combat, and three expedition regions with gathering, specialist requirements and new biological discoveries. Saves support import/export/recovery and offline reload after the first visit. Phases 0 through 6 have individual commits. Native Android/iOS packages are not included. Breeding remains gated on creation-loop playtesting.
+The game includes five starter components, deterministic genetics and mutations, modular creature visuals, transactional manufacturing, collection/journal, 3v3 tactical combat, three expedition regions with gathering and specialist discoveries, and a six-node research tree with scanners, renewable biological blueprints and controlled mutation manufacturing. Saves support import/export/recovery and offline reload after the first visit. Phases 0 through 7 have individual commits. Native Android/iOS packages are not included. Breeding remains gated on creation-loop playtesting.
 
 See [playtest instructions and developer tools](docs/playtest.md), [architecture and phase plan](docs/architecture.md), [phase evidence](docs/progress.md), [milestone review](docs/review.md) and [original specification](docs/specification.md).

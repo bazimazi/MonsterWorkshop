@@ -22,6 +22,8 @@ import {
 import type { Expedition, ExpeditionReport } from '../domain/exploration.js';
 import { deriveCreature } from '../domain/generator.js';
 import { hash } from '../domain/random.js';
+import { decodeScan, hasResearch, researchRequirements, scannerLevel } from '../domain/research.js';
+import type { Scan, ResearchProgress } from '../domain/research.js';
 export interface Options {
   sound: boolean;
   haptics: boolean;
@@ -36,6 +38,7 @@ export interface Experiment {
   compatibility: number;
   mutationIds: string[];
   createdAt: string;
+  controlledMutation: string | null;
 }
 export interface PlayerState {
   contentVersion: number;
@@ -56,6 +59,8 @@ export interface PlayerState {
   resources: Record<string, number>;
   expeditions: Expedition[];
   expeditionReports: ExpeditionReport[];
+  completedResearch: string[];
+  scans: Scan[];
 }
 export function initialState(content: ContentIndex, seed: number): PlayerState {
   const starter = content.catalog.components.filter((p) => p.discovery === 'starter');
@@ -80,6 +85,8 @@ export function initialState(content: ContentIndex, seed: number): PlayerState {
     resources: {},
     expeditions: [],
     expeditionReports: [],
+    completedResearch: [],
+    scans: [],
   };
 }
 export function decodeOptions(value: unknown): Options {
@@ -161,6 +168,12 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
         const componentIds = strings(e.componentIds, 'experiment components', 6),
           mutationIds = strings(e.mutationIds, 'experiment mutations');
         const creature = creatures.find((c) => c.id === e.creatureId);
+        const controlledMutation =
+          e.controlledMutation === undefined || e.controlledMutation === null
+            ? null
+            : string(e.controlledMutation, 'controlled mutation');
+        if (controlledMutation && !mutationIds.includes(controlledMutation))
+          throw new DomainError('Controlled mutation is missing from the creature');
         if (
           !creature ||
           creature.seed !== e.seed ||
@@ -176,6 +189,7 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
           compatibility: e.compatibility,
           mutationIds,
           createdAt: e.createdAt,
+          controlledMutation,
         } as Experiment;
       });
       unique(
@@ -289,6 +303,64 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
         if (activeBattle?.units.some((u) => u.team === 'player' && u.source.id === owned.id))
           throw new DomainError('Creature cannot fight and explore simultaneously');
       }
+      const completedResearch = strings(
+        s.completedResearch ?? [],
+        'completed research',
+        content.research.size,
+      );
+      unique(completedResearch, 'completed research');
+      for (const id of completedResearch)
+        if (!content.research.has(id)) throw new DomainError('Unknown completed research');
+      const scans = list(s.scans ?? [], 'component scans', content.components.size).map((v) =>
+        decodeScan(v, content),
+      );
+      unique(
+        scans.map((scan) => scan.componentId),
+        'component scans',
+      );
+      for (const scan of scans)
+        if (
+          !discoveries.includes(scan.componentId) ||
+          scan.level > scannerLevel(completedResearch, content)
+        )
+          throw new DomainError('Scan exceeds available discoveries or scanner capability');
+      const progress: ResearchProgress = {
+        completedResearch,
+        scans,
+        experimentCount: experiments.length,
+        discoveredMutations: mutations,
+        completedRegions,
+        biomass: s.biomass as number,
+        resources: resources as Record<string, number>,
+      };
+      for (const id of completedResearch)
+        if (
+          researchRequirements(
+            content.research.get(id)!,
+            { ...progress, completedResearch: completedResearch.filter((r) => r !== id) },
+            content,
+            false,
+          ).length
+        )
+          throw new DomainError('Completed research has unmet prerequisites or objectives');
+      for (const id of discoveries.filter((id) => content.component(id).discovery === 'research'))
+        if (
+          !completedResearch.some((r) => {
+            const unlock = content.research.get(r)!.unlock;
+            return unlock.type === 'component' && unlock.id === id;
+          })
+        )
+          throw new DomainError('Research component has no unlocked blueprint');
+      for (const id of completedResearch) {
+        const unlock = content.research.get(id)!.unlock;
+        if (unlock.type === 'component' && !discoveries.includes(unlock.id))
+          throw new DomainError('Research component discovery is missing');
+      }
+      if (
+        experiments.some((e) => e.controlledMutation) &&
+        !hasResearch(completedResearch, 'mutation-control', content)
+      )
+        throw new DomainError('Controlled experiment requires mutation research');
       return structuredClone({
         contentVersion: s.contentVersion,
         playerName: s.playerName,
@@ -308,6 +380,8 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
         resources,
         expeditions,
         expeditionReports,
+        completedResearch,
+        scans,
       }) as PlayerState;
     },
   };

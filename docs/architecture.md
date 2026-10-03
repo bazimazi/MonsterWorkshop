@@ -74,13 +74,14 @@ The PRNG must never use `Math.random` inside domain generation. Content version 
     genome, mutationIds, name, experience, level, training, equipment,
     createdAt, creator, history
   }], experiments: [{ serial, creatureId, componentIds, seed,
-    compatibility, mutationIds, createdAt }],
+    compatibility, mutationIds, createdAt, controlledMutation }],
   claimedBattles: [battleId], activeBattle: null | {
     id, startedAt, round, turnIndex, order, rngState, status, reason, log,
     units: [{ id, team, source: CreatureSource, hp, energy, shield, statuses, cooldowns }]
   }, nextExpeditionSerial, resources: { resourceId: quantity },
   expeditions: [{ id, serial, regionId, source: CreatureSource, seed, elapsedMs, startedAt }],
   expeditionReports: [{ id, regionId, creatureId, outcome, reward }],
+  completedResearch: [nodeId], scans: [{ componentId, level, scannedAt }],
   options: { sound, haptics, reducedMotion, textScale }
 }}
 ```
@@ -106,6 +107,8 @@ Use a pure turn resolver over immutable battle snapshots: three owned creatures 
 
 6. Exploration: biome gathering, specialization, prerequisites, resource storage and reusable discoveries; verify all regions, clock behavior, transactional claims and phone/desktop rendering.
 
+7. Research: observation-gated tree, progressive component scans, reusable biological blueprints, mutation analysis and paid guided creation; verify the entire tree from a fresh save and browser progression.
+
 Each phase gets its own commit after checks pass. Following the first-slice delivery, the user requested continued implementation. Breeding retains the plan's explicit enjoyable-creation-loop gate.
 
 ## Exploration architecture
@@ -115,3 +118,12 @@ Regions and resources live in the catalog. Region dependencies are checked for c
 A creature can occupy one expedition or one battle team at a time. Each assignment has a monotonic serial identity; collecting or recalling moves it into a report ledger. Claims update currency, resources, components, discovery, experience and assignment state in one validated save. Failed writes roll back all changes. Decoding rejects duplicate assignments/claims, impossible progress and mismatched ownership/snapshots.
 
 The browser supplies at most one second of foreground `performance.now()` progress per tick. Visibility changes reset the interval baseline; background suspensions and closed-game wall time grant no progress. No duration is derived from `Date.now()` or saved timestamps. The paused behavior is explicit in the UI. Additive schema-1 migration initializes missing expedition fields while retaining existing creature sources and content version 1.
+
+
+## Research architecture
+
+Research nodes declare costs, acyclic dependencies, objective counts and a typed unlock. Capabilities are derived from completed nodes; UI checks and application actions share the same requirement functions. Scans preserve the current revealed level and date per discovered component. Basic analysis returns a projection with no gene biases, affinities, traits or mutation probability; advanced analysis returns isolated copies of those properties. Reveals never modify existing components or creatures.
+
+Unlocking anatomy gives samples and a reusable cultivation recipe, creating a repeatable use for gathered resources. Mutation Atlas exposes rules only for previously observed mutations and upgrades recipe forecasts from qualitative estimates to numeric probability. Mutation control uses the existing generator's eligible force option after checking research, prior discovery, anatomy and extra costs. The source stores the resulting genome/mutations, while the experiment records the controlled mutation. Older experiment records default to natural creation. Existing generation rules and creature source formats remain unchanged.
+
+Save decoding verifies research prerequisites/objectives, scanner capabilities, discovered-sample ownership, blueprint discoveries and guided experiment authorization. All resource spending and knowledge changes cross the same save boundary; telemetry follows successful writes.

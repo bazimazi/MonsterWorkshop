@@ -1,5 +1,14 @@
 import { ELEMENTS, GENES, QUALITY, SLOTS, STAT_KEYS, STATUS_IDS } from './model.js';
-import type { Catalog, Component, Ability, Trait, Mutation, Resource, Region } from './model.js';
+import type {
+  Catalog,
+  Component,
+  Ability,
+  Trait,
+  Mutation,
+  Resource,
+  Region,
+  ResearchNode,
+} from './model.js';
 import {
   DomainError,
   list,
@@ -257,7 +266,51 @@ export function decodeCatalog(raw: unknown): Catalog {
     throw new DomainError('Expedition fitness weights must sum to one');
   number(x.restockQuantity, 'restock quantity', 1, 100, true);
   number(x.experience, 'expedition experience', 1, 1000, true);
+  const research = table(c.research, 'research'),
+    researchIds = new Set(research.map((r) => r.id as string));
+  for (const r of research) {
+    for (const key of ['name', 'branch', 'description']) string(r[key], `research ${key}`);
+    references(r.prerequisites, researchIds, 'research prerequisite');
+    const objectives = record(r.objectives, 'research objectives');
+    for (const key of ['experiments', 'scans', 'advancedScans', 'mutations'])
+      number(objectives[key], key, 0, 100, true);
+    number(objectives.experiments, 'required experiments', 0, w.maxCreatures as number, true);
+    for (const key of ['scans', 'advancedScans'])
+      number(objectives[key], key, 0, components.length, true);
+    number(objectives.mutations, 'required mutations', 0, mutations.length, true);
+    references(objectives.regions, regionIds, 'research region');
+    validateCost(r.cost, resourceIds);
+    const unlock = record(r.unlock, 'research unlock');
+    member(
+      unlock.type,
+      ['scanner', 'component', 'mutation-analysis', 'mutation-control'],
+      'research unlock',
+    );
+    if (unlock.type === 'scanner') number(unlock.level, 'scanner level', 1, 2, true);
+    if (unlock.type === 'component') {
+      references([unlock.id], componentIds, 'research component');
+      if (components.find((p) => p.id === unlock.id)?.discovery !== 'research')
+        throw new DomainError('Research unlock requires a research component');
+      number(unlock.quantity, 'research samples', 1, 100, true);
+      validateCost(unlock.synthesisCost, resourceIds);
+    }
+  }
+  validateTree(research, 'research');
+  const researchRules = record(rules.research, 'research rules');
+  for (const key of ['basicScanCost', 'advancedScanCost', 'controlledMutationCost'])
+    validateCost(researchRules[key], resourceIds);
   return structuredClone(c) as unknown as Catalog;
+}
+function validateCost(raw: unknown, resourceIds: Set<string>): void {
+  const cost = record(raw, 'cost'),
+    resources = record(cost.resources, 'resource cost');
+  number(cost.biomass, 'biomass cost', 0, 10000, true);
+  for (const [id, quantity] of Object.entries(resources)) {
+    if (!resourceIds.has(id)) throw new DomainError(`Unknown cost resource: ${id}`);
+    number(quantity, 'resource cost', 1, 1000, true);
+  }
+  if (!cost.biomass && !Object.keys(resources).length)
+    throw new DomainError('Research costs cannot be empty');
 }
 export function validateTree(entries: Record<string, unknown>[], label: string): void {
   const visiting = new Set<string>(),
@@ -281,6 +334,7 @@ export class ContentIndex {
   readonly mutations: Map<string, Mutation>;
   readonly resources: Map<string, Resource>;
   readonly regions: Map<string, Region>;
+  readonly research: Map<string, ResearchNode>;
   constructor(readonly catalog: Catalog) {
     this.components = new Map(catalog.components.map((v) => [v.id, v]));
     this.abilities = new Map(catalog.abilities.map((v) => [v.id, v]));
@@ -288,6 +342,7 @@ export class ContentIndex {
     this.mutations = new Map(catalog.mutations.map((v) => [v.id, v]));
     this.resources = new Map(catalog.resources.map((v) => [v.id, v]));
     this.regions = new Map(catalog.regions.map((v) => [v.id, v]));
+    this.research = new Map(catalog.research.map((v) => [v.id, v]));
   }
   component(id: string): Component {
     const value = this.components.get(id);

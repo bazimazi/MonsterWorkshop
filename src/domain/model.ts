@@ -194,6 +194,31 @@ export interface Region {
   discovery: string;
   discoveryChance: number;
 }
+export interface Cost {
+  biomass: number;
+  resources: Record<string, number>;
+}
+export type ResearchUnlock =
+  | { type: 'scanner'; level: 1 | 2 }
+  | { type: 'component'; id: string; quantity: number; synthesisCost: Cost }
+  | { type: 'mutation-analysis' }
+  | { type: 'mutation-control' };
+export interface ResearchNode {
+  id: string;
+  name: string;
+  branch: string;
+  description: string;
+  prerequisites: string[];
+  objectives: {
+    experiments: number;
+    scans: number;
+    advancedScans: number;
+    mutations: number;
+    regions: string[];
+  };
+  cost: Cost;
+  unlock: ResearchUnlock;
+}
 export interface Catalog {
   version: number;
   components: Component[];
@@ -202,6 +227,7 @@ export interface Catalog {
   mutations: Mutation[];
   resources: Resource[];
   regions: Region[];
+  research: ResearchNode[];
   rules: {
     generation: {
       version: number;
@@ -259,5 +285,6 @@ export interface Catalog {
       restockQuantity: number;
       experience: number;
     };
+    research: { basicScanCost: Cost; advancedScanCost: Cost; controlledMutationCost: Cost };
   };
 }

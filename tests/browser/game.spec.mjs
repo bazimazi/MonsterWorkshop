@@ -1,4 +1,114 @@
 import { test, expect } from '@playwright/test';
+import { fullResearchWorkshop } from '../helpers/research-workshop.mjs';
+test('research spends gathered materials, progressively reveals samples and unlocks new anatomy', async ({
+  page,
+}) => {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.clock.install();
+  await page.goto('/');
+  for (const part of ['Spider Legs', 'Lightning Organ', 'Crystal Armor'])
+    await page.getByRole('button', { name: part }).click();
+  for (let i = 0; i < 3; i++) {
+    await page.getByRole('button', { name: 'Manufacture creature' }).click();
+    await page.getByRole('button', { name: 'Skip sequence' }).click();
+    await page.getByRole('button', { name: 'Keep experimenting' }).click();
+  }
+  async function gather(region, ms) {
+    await page.getByRole('link', { name: 'Explore', exact: true }).click();
+    await page.getByRole('button', { name: region }).click();
+    await page.getByRole('combobox', { name: 'Expedition creature' }).selectOption('creature-1');
+    await page.getByRole('button', { name: 'Send on expedition' }).click();
+    await page.clock.runFor(ms + 2000);
+    await page.getByRole('button', { name: 'Collect expedition' }).click();
+  }
+  await gather('Green Meadow', 20000);
+  await page.getByRole('link', { name: 'Research', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Research Basic Biological Scanner', exact: true })
+    .click();
+  for (const component of ['dragon-head', 'wolf-body', 'lightning-organ']) {
+    await page.getByRole('combobox', { name: 'Scanner component' }).selectOption(component);
+    await page.getByRole('button', { name: 'Scan component', exact: true }).click();
+  }
+  await expect(page.locator('.hidden-properties')).toContainText('4 hidden');
+  await expect(page.getByRole('heading', { name: 'Gene biases' })).toHaveCount(0);
+  for (let i = 0; i < 3; i++) await gather('Green Meadow', 20000);
+  await page.getByRole('link', { name: 'Research', exact: true }).click();
+  await page.getByRole('button', { name: 'Research Botanical Anatomy', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Verdant Dragon Head', exact: true }),
+  ).toBeVisible();
+  await gather('Crystal Caves', 40000);
+  await page.getByRole('link', { name: 'Research', exact: true }).click();
+  await page.getByRole('button', { name: 'Research Resonance Scanner', exact: true }).click();
+  await page.getByRole('button', { name: 'Upgrade analysis', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Gene biases' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Mutation potential', exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('.hidden-properties')).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Gene biases' })).toHaveCount(0);
+  await page.getByRole('combobox', { name: 'Scanner component' }).selectOption('lightning-organ');
+  await expect(page.getByRole('heading', { name: 'Gene biases' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: `artifacts/research-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+  await page
+    .locator('.component-scanner')
+    .screenshot({ path: `artifacts/scanner-${test.info().project.name}.png` });
+  await page.getByRole('link', { name: 'Workshop', exact: true }).click();
+  await page.getByRole('button', { name: 'Verdant Dragon Head' }).click();
+  await expect(page.locator('.part.selected[data-part="dragon-head"]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Manufacture creature' }).click();
+  await page.getByRole('button', { name: 'Skip sequence' }).click();
+  await page.getByRole('button', { name: 'Meet your creature' }).click();
+  const state = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('monster-workshop.save')).data,
+  );
+  expect(state.creatures[3].componentIds).toContain('verdant-head');
+  expect(state.scans).toHaveLength(3);
+  expect(state.completedResearch).toHaveLength(3);
+  expect(errors).toEqual([]);
+});
+test('researched mutation guidance enforces biology and pays for a guaranteed discovered mutation', async ({
+  page,
+}) => {
+  const { w } = fullResearchWorkshop();
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  await page.getByLabel('Import save', { exact: true }).setInputFiles({
+    name: 'progress.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(w.exportSave()),
+  });
+  await expect(page.getByRole('status')).toContainText('Workshop imported');
+  await page.getByRole('link', { name: 'Workshop', exact: true }).click();
+  await page
+    .getByRole('combobox', { name: 'Mutation guidance' })
+    .selectOption('electrical-overgrowth');
+  await expect(page.getByRole('button', { name: 'Manufacture creature' })).toBeDisabled();
+  await expect(page.getByText('Needs electric biology.', { exact: true }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Verdant Dragon Head' }).click();
+  await page.getByRole('button', { name: 'Prism Organ' }).click();
+  await expect(page.getByRole('button', { name: 'Manufacture creature' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Manufacture creature' }).click();
+  await page.getByRole('button', { name: 'Skip sequence' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Electrical Overgrowth');
+  await page
+    .getByRole('dialog')
+    .screenshot({ path: `artifacts/research-creature-${test.info().project.name}.png` });
+  await page.getByRole('button', { name: 'Meet your creature' }).click();
+  const state = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('monster-workshop.save')).data,
+  );
+  expect(state.creatures.at(-1).mutationIds).toContain('electrical-overgrowth');
+  expect(state.experiments.at(-1).controlledMutation).toBe('electrical-overgrowth');
+  expect(state.resources.crystal).toBe(w.state.resources.crystal - 2);
+});
 test('expedition survives reload, gathers resources, unlocks a component and supports a specialist build', async ({
   page,
 }) => {

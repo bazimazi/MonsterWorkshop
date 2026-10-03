@@ -36,7 +36,9 @@ test('names are escaped and SVG parts share inherited materials', () => {
   assert.equal(blend('#123456', '#abcdef', 0), '#123456');
 });
 test('discovered alternatives render in their correct slots without losing the shared skeleton', () => {
-  for (const part of content.catalog.components.filter((p) => p.discovery === 'expedition')) {
+  for (const part of content.catalog.components.filter((p) =>
+    ['expedition', 'research'].includes(p.discovery),
+  )) {
     const ids = ['dragon-head', 'wolf-body'].filter(
       (id) => content.component(id).slot !== part.slot,
     );

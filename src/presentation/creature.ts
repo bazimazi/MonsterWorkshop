@@ -19,6 +19,8 @@ export const MESH_KEYS = [
   'storm',
   'herbal',
   'crystal-beast',
+  'verdant',
+  'prism',
 ];
 const visualCaches = new WeakMap<ContentIndex, Map<string, string>>();
 const MAX_CACHED_VISUALS = 128;
@@ -37,6 +39,10 @@ function mesh(key: string, color: string, glow: string, hasLegs: boolean): strin
     light = blend(color, '#ffffff', 0.27);
   const line = 'stroke="#302741" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"';
   switch (key) {
+    case 'verdant':
+      return `${mesh('dragon', color, glow, hasLegs)}<g ${line}><path d="M-51 -3Q-89 -27 -67 -48Q-41 -32 -51 -3ZM51 -3Q89 -27 67 -48Q41 -32 51 -3Z" fill="${light}"/><path d="M-51 -3 -65 -34M51 -3 65 -34" stroke="${dark}"/></g>`;
+    case 'prism':
+      return `<g ${line}><path d="M0 -32 22 -8 16 23 0 36 -16 23 -22 -8Z" fill="${color}"/><path d="M0 -32 0 36M-22 -8 0 1 22 -8M-16 23 0 1 16 23" fill="none" stroke="${light}"/><path d="M4 -17 -8 3 1 3 -3 20 11 -2 3 -2Z" fill="${glow}" stroke="none"/></g>`;
     case 'crystal-beast':
       return `${mesh('wolf', color, glow, hasLegs)}<g ${line}><path d="M-66 -14 -70 -57 -42 -33 -36 -68 -14 -50 -20 -14Z M66 -14 70 -57 42 -33 36 -68 14 -50 20 -14Z" fill="${light}"/><path d="M-45 -39 -39 -20 M45 -39 39 -20" stroke="${glow}"/></g>`;
     case 'herbal':

@@ -1,5 +1,20 @@
-export type Screen = 'workshop' | 'creatures' | 'battle' | 'explore' | 'journal' | 'settings';
-const screens: Screen[] = ['workshop', 'creatures', 'battle', 'explore', 'journal', 'settings'];
+export type Screen =
+  | 'workshop'
+  | 'creatures'
+  | 'battle'
+  | 'explore'
+  | 'research'
+  | 'journal'
+  | 'settings';
+const screens: Screen[] = [
+  'workshop',
+  'creatures',
+  'battle',
+  'explore',
+  'research',
+  'journal',
+  'settings',
+];
 export class Navigation {
   constructor(private render: (screen: Screen) => void) {
     window.addEventListener('hashchange', () => this.render(this.current));

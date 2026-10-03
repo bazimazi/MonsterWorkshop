@@ -357,6 +357,87 @@
       },
       "lore": "Light membrane sails catch the shifting currents above Storm Valley.",
       "discovery": "expedition"
+    },
+    {
+      "id": "verdant-head",
+      "name": "Verdant Dragon Head",
+      "slot": "head",
+      "category": "Botanical",
+      "rarity": "rare",
+      "element": "nature",
+      "stats": {
+        "hp": 8,
+        "attack": 4,
+        "power": 12,
+        "speed": 3
+      },
+      "genes": {
+        "adaptation": 20,
+        "intelligence": 15,
+        "stability": 8
+      },
+      "abilities": ["mend"],
+      "traits": ["resilient"],
+      "tags": ["dragon", "plant", "herbal", "healer"],
+      "compatibleTags": ["plant", "mammal", "mineral"],
+      "conflictTags": [],
+      "energyCost": 4,
+      "weight": 2,
+      "size": 1,
+      "mutationChance": 0.01,
+      "visual": {
+        "mesh": "verdant",
+        "anchor": "head",
+        "scale": 1,
+        "allowedScale": [0.85, 1.15],
+        "rotation": 0,
+        "allowedRotation": [-10, 10],
+        "layer": 5,
+        "color": "#8ac993",
+        "inheritColor": 0.15
+      },
+      "lore": "Research coaxed restorative leaves to grow along this gentle dragon face.",
+      "discovery": "research"
+    },
+    {
+      "id": "prism-organ",
+      "name": "Prism Organ",
+      "slot": "organ",
+      "category": "Mineral",
+      "rarity": "rare",
+      "element": "crystal",
+      "stats": {
+        "power": 17,
+        "energy": 14,
+        "defense": 4
+      },
+      "genes": {
+        "element": 20,
+        "intelligence": 15,
+        "mutation": 10
+      },
+      "abilities": ["thunder-pulse", "crystal-guard"],
+      "traits": ["conductive"],
+      "tags": ["crystal", "mineral", "electric", "experimental"],
+      "compatibleTags": ["crystal", "mineral", "electric"],
+      "conflictTags": [],
+      "energyCost": 5,
+      "weight": 1,
+      "size": 1,
+      "mutationChance": 0.04,
+      "visual": {
+        "mesh": "prism",
+        "anchor": "organ",
+        "scale": 1,
+        "allowedScale": [0.8, 1.2],
+        "rotation": 0,
+        "allowedRotation": [-5, 5],
+        "layer": 6,
+        "color": "#a9cef2",
+        "inheritColor": 0.1
+      },
+      "lore": "A cultured crystalline heart stores lightning inside a resonant lattice.",
+      "discovery": "research"
     }
   ],
   "traits": [
@@ -757,6 +838,24 @@
       "discoveryBonus": 0.3,
       "restockQuantity": 2,
       "experience": 10
+    },
+    "research": {
+      "basicScanCost": {
+        "biomass": 2,
+        "resources": {}
+      },
+      "advancedScanCost": {
+        "biomass": 3,
+        "resources": {
+          "crystal": 1
+        }
+      },
+      "controlledMutationCost": {
+        "biomass": 20,
+        "resources": {
+          "crystal": 2
+        }
+      }
     }
   },
   "resources": [
@@ -829,6 +928,166 @@
       "restock": ["lightning-organ", "storm-wings"],
       "discovery": "gale-wings",
       "discoveryChance": 0.3
+    }
+  ],
+  "research": [
+    {
+      "id": "basic-scanner",
+      "name": "Basic Biological Scanner",
+      "branch": "Genetics",
+      "description": "Analyze recovered components to identify their elemental biology and primary tags.",
+      "prerequisites": [],
+      "objectives": {
+        "experiments": 0,
+        "scans": 0,
+        "advancedScans": 0,
+        "mutations": 0,
+        "regions": ["green-meadow"]
+      },
+      "cost": {
+        "biomass": 10,
+        "resources": {
+          "fiber": 3
+        }
+      },
+      "unlock": {
+        "type": "scanner",
+        "level": 1
+      }
+    },
+    {
+      "id": "botanical-anatomy",
+      "name": "Botanical Anatomy",
+      "branch": "Anatomy",
+      "description": "Combine field observations and experiments to cultivate a new restorative dragon head.",
+      "prerequisites": ["basic-scanner"],
+      "objectives": {
+        "experiments": 3,
+        "scans": 3,
+        "advancedScans": 0,
+        "mutations": 0,
+        "regions": []
+      },
+      "cost": {
+        "biomass": 25,
+        "resources": {
+          "fiber": 6
+        }
+      },
+      "unlock": {
+        "type": "component",
+        "id": "verdant-head",
+        "quantity": 2,
+        "synthesisCost": {
+          "biomass": 6,
+          "resources": {
+            "fiber": 2
+          }
+        }
+      }
+    },
+    {
+      "id": "advanced-scanner",
+      "name": "Resonance Scanner",
+      "branch": "Genetics",
+      "description": "Resolve gene biases, hidden affinities, traits and mutation potential in each component.",
+      "prerequisites": ["basic-scanner"],
+      "objectives": {
+        "experiments": 0,
+        "scans": 2,
+        "advancedScans": 0,
+        "mutations": 0,
+        "regions": ["crystal-caves"]
+      },
+      "cost": {
+        "biomass": 20,
+        "resources": {
+          "fiber": 3,
+          "crystal": 3
+        }
+      },
+      "unlock": {
+        "type": "scanner",
+        "level": 2
+      }
+    },
+    {
+      "id": "crystalline-anatomy",
+      "name": "Crystalline Anatomy",
+      "branch": "Elements",
+      "description": "Use resolved scans to culture a crystalline organ that channels stored lightning.",
+      "prerequisites": ["advanced-scanner"],
+      "objectives": {
+        "experiments": 4,
+        "scans": 0,
+        "advancedScans": 2,
+        "mutations": 0,
+        "regions": []
+      },
+      "cost": {
+        "biomass": 30,
+        "resources": {
+          "crystal": 6
+        }
+      },
+      "unlock": {
+        "type": "component",
+        "id": "prism-organ",
+        "quantity": 2,
+        "synthesisCost": {
+          "biomass": 8,
+          "resources": {
+            "crystal": 2
+          }
+        }
+      }
+    },
+    {
+      "id": "mutation-atlas",
+      "name": "Mutation Atlas",
+      "branch": "Mutation",
+      "description": "Study an observed mutation to reveal its biological conditions and precise design forecasts.",
+      "prerequisites": ["advanced-scanner"],
+      "objectives": {
+        "experiments": 0,
+        "scans": 0,
+        "advancedScans": 0,
+        "mutations": 1,
+        "regions": []
+      },
+      "cost": {
+        "biomass": 15,
+        "resources": {
+          "crystal": 3
+        }
+      },
+      "unlock": {
+        "type": "mutation-analysis"
+      }
+    },
+    {
+      "id": "controlled-mutation",
+      "name": "Controlled Mutation",
+      "branch": "Mutation",
+      "description": "Guide a previously discovered, eligible mutation during manufacturing by spending extra biomass and crystals.",
+      "prerequisites": ["mutation-atlas", "crystalline-anatomy"],
+      "objectives": {
+        "experiments": 8,
+        "scans": 0,
+        "advancedScans": 3,
+        "mutations": 0,
+        "regions": ["storm-valley"]
+      },
+      "cost": {
+        "biomass": 45,
+        "resources": {
+          "crystal": 6,
+          "storm-essence": 3
+        }
+      },
+      "unlock": {
+        "type": "mutation-control"
+      }
     }
   ]
 }

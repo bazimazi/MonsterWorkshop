@@ -13,6 +13,8 @@ import { availableAbilities, canUse, currentActor } from '../domain/combat.js';
 import type { Battle, Combatant } from '../domain/combat.js';
 import { deriveCreature } from '../domain/generator.js';
 import { explorationView } from './exploration.js';
+import { describeCost, researchView } from './research.js';
+import { costRequirements, hasResearch, mutationConditions } from '../domain/research.js';
 import type { BattleReward } from '../application/workshop.js';
 export function downloadSave(raw: string): void {
   const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' })),
@@ -58,6 +60,8 @@ export class GameUI {
   private explorerId: string | undefined;
   private lastTick = performance.now();
   private clockFailed = false;
+  private scannerId = 'dragon-head';
+  private controlledMutation: string | undefined;
   constructor(
     private root: HTMLElement,
     private workshop: Workshop,
@@ -146,27 +150,38 @@ export class GameUI {
   private render(focusPart?: string): void {
     const state = this.workshop.state;
     this.applyOptions(state);
+    if (!hasResearch(state.completedResearch, 'mutation-control', this.content))
+      this.controlledMutation = undefined;
     const screen = this.nav.current;
     const body =
-      screen === 'explore'
-        ? explorationView(state, this.workshop, this.content, this.regionId, this.explorerId)
-        : screen === 'creatures'
-          ? this.creaturesView(state)
-          : screen === 'battle'
-            ? this.battleView(state)
-            : screen === 'journal'
-              ? this.journalView(state)
-              : screen === 'settings'
-                ? this.settingsView(state)
-                : this.workshopView(state);
+      screen === 'research'
+        ? researchView(
+            state,
+            this.workshop,
+            this.content,
+            state.discoveredComponents.includes(this.scannerId)
+              ? this.scannerId
+              : state.discoveredComponents[0]!,
+          )
+        : screen === 'explore'
+          ? explorationView(state, this.workshop, this.content, this.regionId, this.explorerId)
+          : screen === 'creatures'
+            ? this.creaturesView(state)
+            : screen === 'battle'
+              ? this.battleView(state)
+              : screen === 'journal'
+                ? this.journalView(state)
+                : screen === 'settings'
+                  ? this.settingsView(state)
+                  : this.workshopView(state);
     const tabs: [Screen, string, string][] = [
       ['workshop', 'Workshop', '⚗'],
       ['creatures', 'Creatures', '◈'],
       ['battle', 'Battle', '⚔'],
-      ['journal', 'Journal', '≡'],
+      ['research', 'Research', '⌕'],
       ['explore', 'Explore', '❧'],
     ];
-    this.root.innerHTML = `<header class="topbar"><a class="brand" href="#workshop"><img src="./icon.svg" alt="" width="36" height="36"><span>MONSTER<span class="brand-light">WORKSHOP</span></span></a><div class="resource"><span class="resource-dot" aria-hidden="true"></span><strong>${state.biomass}</strong><span>biomass</span></div><a class="utility-link" href="#settings" aria-label="Settings">&#9881;</a></header><nav class="navigation" aria-label="Main navigation">${tabs.map(([key, label, symbol]) => `<a href="#${key}" ${screen === key ? 'aria-current="page"' : ''}><span aria-hidden="true">${symbol}</span>${label}${key === 'creatures' ? `<small>${state.creatures.length}</small>` : ''}</a>`).join('')}</nav><main class="shell game-shell">${this.notice ? `<div class="notice ${this.isError ? 'error' : ''}" role="${this.isError ? 'alert' : 'status'}">${escape(this.notice)}<button class="quiet" data-action="dismiss" aria-label="Dismiss message">×</button></div>` : ''}${body}</main><footer class="footer">A little science. A little strange. <span>Saved on this device</span></footer>${this.modal()}`;
+    this.root.innerHTML = `<header class="topbar"><a class="brand" href="#workshop"><img src="./icon.svg" alt="" width="36" height="36"><span>MONSTER<span class="brand-light">WORKSHOP</span></span></a><div class="resource"><span class="resource-dot" aria-hidden="true"></span><strong>${state.biomass}</strong><span>biomass</span></div><div class="utility-links"><a class="utility-link" href="#journal" aria-label="Journal">&#8801;</a><a class="utility-link" href="#settings" aria-label="Settings">&#9881;</a></div></header><nav class="navigation" aria-label="Main navigation">${tabs.map(([key, label, symbol]) => `<a href="#${key}" ${screen === key ? 'aria-current="page"' : ''}><span aria-hidden="true">${symbol}</span>${label}${key === 'creatures' ? `<small>${state.creatures.length}</small>` : ''}</a>`).join('')}</nav><main class="shell game-shell">${this.notice ? `<div class="notice ${this.isError ? 'error' : ''}" role="${this.isError ? 'alert' : 'status'}">${escape(this.notice)}<button class="quiet" data-action="dismiss" aria-label="Dismiss message">×</button></div>` : ''}${body}</main><footer class="footer">A little science. A little strange. <span>Saved on this device</span></footer>${this.modal()}`;
     const dialog = this.root.querySelector<HTMLDialogElement>('dialog');
     if (dialog) {
       dialog.showModal();
@@ -187,6 +202,10 @@ export class GameUI {
         createdAt: '2026-10-02T00:00:00Z',
         creator: 'Preview',
         skipMutations: true,
+        ...(this.controlledMutation &&
+        !mutationConditions([...this.selected], this.controlledMutation, this.content).length
+          ? { forceMutation: this.controlledMutation }
+          : {}),
       });
     } catch {
       return undefined;
@@ -197,19 +216,52 @@ export class GameUI {
   }
   private workshopView(state: PlayerState): string {
     const creature = this.preview(),
-      cost = creature ? this.workshop.cost([...this.selected]) : 0;
+      cost = creature
+        ? this.workshop.cost([...this.selected]) +
+          (this.controlledMutation
+            ? this.content.catalog.rules.research.controlledMutationCost.biomass
+            : 0)
+        : 0;
+    const controlAvailable = hasResearch(state.completedResearch, 'mutation-control', this.content);
+    const controlReasons = this.controlledMutation
+      ? [
+          ...mutationConditions([...this.selected], this.controlledMutation, this.content),
+          ...costRequirements(
+            this.content.catalog.rules.research.controlledMutationCost,
+            state.biomass,
+            state.resources,
+            this.content,
+          ),
+        ]
+      : [];
+    const mutationForecast = this.controlledMutation
+      ? 'Controlled: guaranteed'
+      : !creature
+        ? 'Unresolved'
+        : hasResearch(state.completedResearch, 'mutation-analysis', this.content)
+          ? Math.round(creature.compatibility.mutationChance * 100) + '%'
+          : creature.compatibility.mutationChance === 0
+            ? 'None detected'
+            : creature.compatibility.mutationChance < 0.25
+              ? 'Low'
+              : creature.compatibility.mutationChance < 0.5
+                ? 'Moderate'
+                : 'High';
     const enough =
       creature &&
       cost <= state.biomass &&
+      !controlReasons.length &&
       [...this.selected].every((id) => (state.inventory[id] ?? 0) > 0) &&
       state.creatures.length < this.content.catalog.rules.workshop.maxCreatures;
-    const blockedReason = !creature
-      ? 'Choose a head and body to complete the anatomy.'
-      : state.creatures.length >= this.content.catalog.rules.workshop.maxCreatures
-        ? `Your habitat is full (${this.content.catalog.rules.workshop.maxCreatures} specimens). Export your discoveries in Settings.`
-        : cost > state.biomass
-          ? 'Not enough biomass. Win a simulator battle to replenish it.'
-          : 'A selected part is out of stock. Win a simulator battle to replenish it.';
+    const blockedReason = controlReasons.length
+      ? controlReasons.join(' ')
+      : !creature
+        ? 'Choose a head and body to complete the anatomy.'
+        : state.creatures.length >= this.content.catalog.rules.workshop.maxCreatures
+          ? `Your habitat is full (${this.content.catalog.rules.workshop.maxCreatures} specimens). Export your discoveries in Settings.`
+          : cost > state.biomass
+            ? 'Not enough biomass. Win a simulator battle to replenish it.'
+            : 'A selected part is out of stock. Win a simulator battle to replenish it.';
     const guidance =
       state.creatures.length === 0
         ? 'Start with a head and body. Add an organ, then bring your idea to life.'
@@ -227,7 +279,7 @@ export class GameUI {
       })
       .join(
         '',
-      )}</div><div class="forecast"><div><span>Compatibility</span><strong>${creature ? creature.compatibility.score + '%' : '—'}</strong></div><div class="meter"><span style="width:${creature?.compatibility.score ?? 0}%"></span></div><div><span>${creature?.compatibility.tier ?? 'Incomplete anatomy'}</span><span class="mutation-hint">Mutation potential ${creature ? Math.round(creature.compatibility.mutationChance * 100) + '%' : '—'}</span></div></div>${creature?.compatibility.reasons.length ? `<details class="interactions"><summary>Genetic interactions · ${creature.compatibility.reasons.length}</summary><ul>${creature.compatibility.reasons.map((r) => `<li>${escape(r)}</li>`).join('')}</ul></details>` : ''}<button class="primary manufacture" data-action="manufacture" ${!enough ? 'disabled' : ''}><span>✦ Manufacture creature</span><span>${cost} biomass</span></button>${!enough ? `<p class="micro">${escape(blockedReason)}</p>` : '<p class="micro">Consumes one of each selected part. No two genomes are quite alike.</p>'}</section></div>`;
+      )}</div><div class="forecast"><div><span>Compatibility</span><strong>${creature ? creature.compatibility.score + '%' : '—'}</strong></div><div class="meter"><span style="width:${creature?.compatibility.score ?? 0}%"></span></div><div><span>${creature?.compatibility.tier ?? 'Incomplete anatomy'}</span><span class="mutation-hint">Mutation potential ${mutationForecast}</span></div></div>${creature?.compatibility.reasons.length ? `<details class="interactions"><summary>Genetic interactions · ${creature.compatibility.reasons.length}</summary><ul>${creature.compatibility.reasons.map((r) => `<li>${escape(r)}</li>`).join('')}</ul></details>` : ''}${controlAvailable ? `<label class="controlled-picker">Mutation guidance<select aria-label="Mutation guidance" data-controlled-mutation="true"><option value="">Natural experiment</option>${state.discoveredMutations.map((id) => `<option value="${id}" ${this.controlledMutation === id ? 'selected' : ''}>${escape(this.content.mutations.get(id)!.name)}</option>`).join('')}</select></label><p class="micro">Guided creation adds ${escape(describeCost(this.content.catalog.rules.research.controlledMutationCost, this.content))}. Required biology still applies.</p>${controlReasons.map((r) => `<p class="micro requirement">${escape(r)}</p>`).join('')}` : ''}<button class="primary manufacture" data-action="manufacture" ${!enough ? 'disabled' : ''}><span>✦ Manufacture creature</span><span>${cost} biomass</span></button>${!enough ? `<p class="micro">${escape(blockedReason)}</p>` : '<p class="micro">Consumes one of each selected part. No two genomes are quite alike.</p>'}</section></div>`;
   }
   private creaturesView(state: PlayerState): string {
     const all = this.workshop.creatures,
@@ -360,9 +412,12 @@ export class GameUI {
     const id = this.sequence?.id ?? this.revealId;
     if (!id) return '';
     const creature = this.workshop.creatures.find((c) => c.id === id)!;
+    const guided = this.workshop.state.experiments.some(
+      (e) => e.creatureId === id && e.controlledMutation,
+    );
     if (this.sequence)
       return `<dialog class="creation-dialog" aria-labelledby="sequence-title"><p class="eyebrow">MANUFACTURING IN PROGRESS</p><h2 id="sequence-title">${sequenceSteps[this.sequence.step]}</h2><div class="scan-orb" aria-hidden="true">ϟ</div><div class="sequence-dots" aria-hidden="true">${sequenceSteps.map((_, i) => `<span class="${i <= this.sequence!.step ? 'active' : ''}"></span>`).join('')}</div><p class="muted">Something impossible is waking up.</p><button class="secondary" data-action="skip">Skip sequence</button></dialog>`;
-    return `<dialog class="creation-dialog reveal" aria-labelledby="reveal-title"><p class="eyebrow">${creature.mutationIds.length ? '✦ UNEXPECTED MUTATION' : 'MANUFACTURE COMPLETE'}</p><h2 id="reveal-title">${escape(creature.name)}</h2>${renderCreature(creature, this.content, this.animated())}<span class="tag">${title(creature.quality)} · ${title(creature.element)}</span>${creature.mutationIds.map((id) => `<div class="discovery"><strong>${escape(this.content.mutations.get(id)!.name)}</strong><p>${escape(this.content.mutations.get(id)!.description)}</p></div>`).join('')}<p class="muted">You made this. Now see what it can do.</p><div class="dialog-actions"><button class="primary" data-action="view-created">Meet your creature</button><button class="quiet" data-action="close">Keep experimenting</button></div></dialog>`;
+    return `<dialog class="creation-dialog reveal" aria-labelledby="reveal-title"><p class="eyebrow">${guided ? '✦ GUIDED MUTATION' : creature.mutationIds.length ? '✦ UNEXPECTED MUTATION' : 'MANUFACTURE COMPLETE'}</p><h2 id="reveal-title">${escape(creature.name)}</h2>${renderCreature(creature, this.content, this.animated())}<span class="tag">${title(creature.quality)} · ${title(creature.element)}</span>${creature.mutationIds.map((id) => `<div class="discovery"><strong>${escape(this.content.mutations.get(id)!.name)}</strong><p>${escape(this.content.mutations.get(id)!.description)}</p></div>`).join('')}<p class="muted">You made this. Now see what it can do.</p><div class="dialog-actions"><button class="primary" data-action="view-created">Meet your creature</button><button class="quiet" data-action="close">Keep experimenting</button></div></dialog>`;
   }
   private closeReveal(): void {
     if (this.timer) clearTimeout(this.timer);
@@ -404,7 +459,11 @@ export class GameUI {
       this.render(id);
     }
     if (action === 'manufacture' && !this.sequence && !this.revealId) {
-      const creature = this.workshop.manufacture([...this.selected], new Date().toISOString());
+      const creature = this.workshop.manufacture(
+        [...this.selected],
+        new Date().toISOString(),
+        this.controlledMutation,
+      );
       this.inspectedId = creature.id;
       this.feedback.play('create');
       this.notice = '';
@@ -429,6 +488,28 @@ export class GameUI {
       this.root
         .querySelector('#specimen-detail')
         ?.scrollIntoView({ behavior: this.animated() ? 'smooth' : 'instant', block: 'start' });
+    }
+    if (action === 'research') {
+      this.workshop.completeResearch(button.dataset.id!);
+      this.notice = `${this.content.research.get(button.dataset.id!)!.name} researched.`;
+      this.render();
+    }
+    if (action === 'open-scanner') {
+      this.root
+        .querySelector('#component-scanner')
+        ?.scrollIntoView({ behavior: this.animated() ? 'smooth' : 'instant', block: 'start' });
+      this.root.querySelector<HTMLElement>('#component-scanner h2')?.focus({ preventScroll: true });
+    }
+    if (action === 'scan') {
+      this.workshop.scanComponent(button.dataset.id!, new Date().toISOString());
+      this.notice = 'Biological analysis saved.';
+      this.render();
+      this.root.querySelector('#component-scanner')?.scrollIntoView({ block: 'start' });
+    }
+    if (action === 'cultivate') {
+      this.workshop.cultivateComponent(button.dataset.id!);
+      this.notice = `${this.content.component(button.dataset.id!).name} cultivated. One sample added to storage.`;
+      this.render();
     }
     if (action === 'region') {
       this.regionId = button.dataset.region!;
@@ -532,6 +613,14 @@ export class GameUI {
     }
   }
   private async change(input: HTMLInputElement): Promise<void> {
+    if (input.dataset.scannerComponent) {
+      this.scannerId = input.value;
+      this.render();
+    }
+    if (input.dataset.controlledMutation) {
+      this.controlledMutation = input.value || undefined;
+      this.render();
+    }
     if (input.dataset.explorer) {
       this.explorerId = input.value || undefined;
       this.render();
@@ -562,6 +651,7 @@ export class GameUI {
       );
       this.inspectedId = undefined;
       this.explorerId = undefined;
+      this.controlledMutation = undefined;
       this.lastTick = performance.now();
       this.reward = undefined;
       this.squadInitialized = false;

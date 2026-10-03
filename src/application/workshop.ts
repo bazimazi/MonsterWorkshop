@@ -1,5 +1,5 @@
 import type { ContentIndex } from '../domain/catalog.js';
-import type { Creature } from '../domain/model.js';
+import type { Cost, Creature } from '../domain/model.js';
 import { deriveCreature, generateCreature, validateAnatomy } from '../domain/generator.js';
 import { decodeCreature } from '../domain/serialization.js';
 import { DomainError, date, number, string } from '../domain/validation.js';
@@ -22,6 +22,14 @@ import {
   expeditionReward,
 } from '../domain/exploration.js';
 import type { Expedition, ExpeditionReward } from '../domain/exploration.js';
+import {
+  costRequirements,
+  hasResearch,
+  researchNode,
+  researchRequirements,
+  scannerLevel,
+} from '../domain/research.js';
+import type { ResearchProgress, Scan } from '../domain/research.js';
 export interface BattleReward {
   victory: boolean;
   biomass: number;
@@ -60,6 +68,79 @@ export class Workshop {
           .map((r) => r.regionId),
       ),
     ];
+  }
+  get researchProgress(): ResearchProgress {
+    const state = this.state;
+    return {
+      completedResearch: state.completedResearch,
+      scans: state.scans,
+      experimentCount: state.experiments.length,
+      discoveredMutations: state.discoveredMutations,
+      completedRegions: this.completedRegions,
+      biomass: state.biomass,
+      resources: state.resources,
+    };
+  }
+  private spend(state: PlayerState, cost: Cost): void {
+    const reasons = costRequirements(cost, state.biomass, state.resources, this.content);
+    if (reasons.length) throw new DomainError(reasons.join(' '));
+    state.biomass -= cost.biomass;
+    for (const [id, quantity] of Object.entries(cost.resources))
+      state.resources[id] = state.resources[id]! - quantity;
+  }
+  completeResearch(id: string): void {
+    const node = researchNode(id, this.content);
+    const reasons = researchRequirements(node, this.researchProgress, this.content);
+    if (reasons.length) throw new DomainError(reasons.join(' '));
+    this.transact((next) => {
+      this.spend(next, node.cost);
+      next.completedResearch.push(id);
+      if (node.unlock.type === 'component') {
+        if (!next.discoveredComponents.includes(node.unlock.id))
+          next.discoveredComponents.push(node.unlock.id);
+        next.inventory[node.unlock.id] =
+          (next.inventory[node.unlock.id] ?? 0) + node.unlock.quantity;
+      }
+    });
+    this.analytics.track('research_completed', { id });
+  }
+  scanComponent(id: string, at: string): Scan {
+    date(at, 'scan time');
+    this.content.component(id);
+    const level = scannerLevel(this.value.completedResearch, this.content);
+    if (!level) throw new DomainError('Research a biological scanner first');
+    if (!this.value.discoveredComponents.includes(id))
+      throw new DomainError('Discover this component before scanning');
+    const previous = this.value.scans.find((s) => s.componentId === id);
+    if (previous && previous.level >= level)
+      throw new DomainError('This component is already analyzed at the current scanner level');
+    const cost =
+      level === 1
+        ? this.content.catalog.rules.research.basicScanCost
+        : this.content.catalog.rules.research.advancedScanCost;
+    const scan: Scan = { componentId: id, level: level as 1 | 2, scannedAt: at };
+    this.transact((next) => {
+      this.spend(next, cost);
+      next.scans = [...next.scans.filter((s) => s.componentId !== id), scan];
+    });
+    this.analytics.track('component_scanned', { id, level });
+    return scan;
+  }
+  cultivateComponent(id: string): void {
+    const node = this.content.catalog.research.find(
+      (n) => n.unlock.type === 'component' && n.unlock.id === id,
+    );
+    if (
+      !node ||
+      node.unlock.type !== 'component' ||
+      !this.value.completedResearch.includes(node.id)
+    )
+      throw new DomainError('Research this biological blueprint first');
+    const cost = node.unlock.synthesisCost;
+    this.transact((next) => {
+      this.spend(next, cost);
+      next.inventory[id] = (next.inventory[id] ?? 0) + 1;
+    });
   }
   startExpedition(regionId: string, creatureId: string, at: string): Expedition {
     date(at, 'departure time');
@@ -158,9 +239,18 @@ export class Workshop {
     this.saves.write(next);
     this.value = next;
   }
-  manufacture(ids: string[], at: string): Creature {
+  manufacture(ids: string[], at: string, controlledMutation?: string): Creature {
     date(at, 'creation time');
-    const cost = this.cost(ids),
+    const controlCost = controlledMutation
+      ? this.content.catalog.rules.research.controlledMutationCost
+      : { biomass: 0, resources: {} };
+    if (
+      controlledMutation &&
+      (!hasResearch(this.value.completedResearch, 'mutation-control', this.content) ||
+        !this.value.discoveredMutations.includes(controlledMutation))
+    )
+      throw new DomainError('Research mutation control and discover this mutation first');
+    const cost = this.cost(ids) + controlCost.biomass,
       state = this.value;
     if (state.creatures.length >= this.content.catalog.rules.workshop.maxCreatures)
       throw new DomainError('Your habitat is full');
@@ -176,9 +266,10 @@ export class Workshop {
       createdAt: at,
       creator: state.playerName,
       id: `creature-${serial}`,
+      ...(controlledMutation ? { forceMutation: controlledMutation } : {}),
     });
     this.transact((next) => {
-      next.biomass -= cost;
+      this.spend(next, { biomass: cost, resources: controlCost.resources });
       next.nextSerial++;
       for (const id of ids) next.inventory[id] = next.inventory[id]! - 1;
       const fresh = creature.mutationIds.filter((id) => !next.discoveredMutations.includes(id));
@@ -195,6 +286,7 @@ export class Workshop {
         compatibility: creature.compatibility.score,
         mutationIds: creature.mutationIds,
         createdAt: at,
+        controlledMutation: controlledMutation ?? null,
       });
     });
     this.analytics.track('creature_created', {
