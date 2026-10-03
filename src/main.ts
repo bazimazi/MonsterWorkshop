@@ -25,10 +25,11 @@ try {
   } catch (error) {
     logger.error(error);
     root.innerHTML = `<main class="shell"><section class="panel"><p class="eyebrow">SAVE RECOVERY</p><h1>Your workshop needs attention.</h1><p>${escape(error instanceof Error ? error.message : 'Save could not load')}</p><p class="muted">Your current save has been preserved. Export it before starting over.</p><div class="save-actions"><button class="secondary" id="export-damaged">Export current save</button><button class="secondary" id="restore">Restore backup</button><button class="quiet" id="restart">Start a new workshop</button></div><p id="recovery-error" role="alert"></p></section></main>`;
-    const recover = (action: () => void): void => {
+    const recover = (action: () => void, reload = true): void => {
       try {
+        root.querySelector('#recovery-error')!.textContent = '';
         action();
-        location.reload();
+        if (reload) location.reload();
       } catch (recoveryError) {
         root.querySelector('#recovery-error')!.textContent =
           recoveryError instanceof Error ? recoveryError.message : 'Recovery failed';
@@ -36,7 +37,7 @@ try {
     };
     root
       .querySelector('#export-damaged')!
-      .addEventListener('click', () => downloadSave(saves.export()));
+      .addEventListener('click', () => recover(() => downloadSave(saves.export()), false));
     root.querySelector('#restore')!.addEventListener('click', () =>
       recover(() => {
         saves.restoreBackup();

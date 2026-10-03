@@ -57,3 +57,11 @@ Current automated coverage is 76 unit tests and 42 phone/desktop browser scenari
 Same-screen updates preserve keyboard focus and expanded disclosures. Settings and biology choices no longer restart the tab sequence at the header, and combat selections retain their control focus. Dialog focus cycles in both directions and returns to the opener, with a heading fallback for disabled/removed controls. The first-tab skip link reaches the current screen's content without altering its route.
 
 Current verification passes 76 unit tests and 50 phone/desktop browser scenarios, strict compilation and formatting. The eight new keyboard runs cover settings, consecutive parent choices, regions, scanning, market/habitat selectors, combat, blueprint/offspring reveals, profile text selection and visiting disclosures. Focus screenshots were visually inspected. This is browser keyboard evidence; it does not complete the outstanding screen-reader, physical-device or human-enjoyment acceptance checks.
+
+## Persistence boundary review
+
+Recovery no longer copies damaged primary data over a usable backup. An interrupted restore preserves both records until a retry succeeds; repeated recovery and empty primary records retain the valid backup. Blocked storage reads produce a displayed error, including during recovery exports, and exporting after reads recover preserves the exact damaged bytes.
+
+Assignment snapshots must match owned biology, origin and growth, with valid renames and reordered JSON retained. Battle/claim IDs must belong to the workshop and precede its next serial. Browser imports with changed snapshots leave the primary and backup unchanged. These are consistency checks for the offline save format, whose broader local-editing limits are described above.
+
+Current verification passes 82 unit tests, 56 phone/desktop browser scenarios, strict compilation and formatting. Existing migration, deterministic resume, unique rewards, live content, recovery and keyboard paths remain green. Human and physical-device acceptance work remains outstanding.

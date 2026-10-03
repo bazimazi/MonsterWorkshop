@@ -66,8 +66,10 @@ npm run lab -- blueprint monster-workshop-blueprint.json
 npm run lab -- generate 17 dragon-head wolf-body frost-organ storm-wings --mutation=storm-frost
 ```
 
-The force example uses the developer tool's October 2, 2026 timestamp, inside Aurora Lab. Runtime seasonal creation uses the actual calendar window. Current automated coverage: 76 unit tests plus 50 phone/desktop browser scenarios.
+The force example uses the developer tool's October 2, 2026 timestamp, inside Aurora Lab. Runtime seasonal creation uses the actual calendar window. Current automated coverage: 82 unit tests plus 56 phone/desktop browser scenarios.
 
 If browser storage prevents a timer save, expeditions and parent recovery pause visibly. Free storage, then use **Resume active timers** to retry saving. A failed retry keeps progress paused; a successful retry resumes future foreground progress without catch-up. Importing or restoring a valid workshop also resets timer failures and clears previous specimen, parent and squad selections. Calendar and seasonal supply screens refresh across weekly boundaries while open.
 
 For keyboard play, the first Tab reveals **Skip to content**. Activate it to move to the current page heading. Selectors, toggles, combat controls and form submissions retain focus during updates, and expanded panels remain open. In creature reveals, Tab/Shift+Tab cycle through dialog actions and Escape closes the reveal. Focus returns to the control that opened it; if that control is now disabled, focus moves to the page heading. Check this path with a screen reader during human acceptance testing.
+
+An empty, damaged or unsupported stored save opens the recovery screen. Export its exact bytes before resetting, or restore a valid backup. Restoring damaged primary data retains the usable backup for another recovery; a failed write leaves both records available for retry. If reads are blocked, recovery buttons report the storage error. After access returns, export can be retried without reloading or replacing the saved data.

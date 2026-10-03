@@ -51,6 +51,75 @@ test('owned squads only; an active battle survives reload with the same next tur
   const moved = f.workshop.battleAction(chooseAction(b, content));
   assert.deepEqual(new Workshop(content, f.repo, f.analytics, 99).state.activeBattle, moved);
 });
+test('battle imports reject changed player biology or growth while allowing an assigned creature to be renamed', () => {
+  const f = fixture();
+  f.workshop.startBattle(
+    f.workshop.creatures.map((c) => c.id),
+    at,
+  );
+  const before = f.workshop.state;
+  for (const change of [
+    (source) => (source.genome.strength.value = 100),
+    (source) => (source.level = 100),
+    (source) => (source.training.attack = 500),
+    (source) => source.seed++,
+    (source) => (source.createdAt = '2026-10-01T00:00:00Z'),
+    (source) => (source.creator = 'Another engineer'),
+  ]) {
+    const damaged = structuredClone(before);
+    change(damaged.activeBattle.units.find((u) => u.team === 'player').source);
+    assert.throws(
+      () => f.workshop.importSave(JSON.stringify({ schemaVersion: 1, data: damaged })),
+      /source|snapshot/,
+    );
+    assert.deepEqual(f.workshop.state, before);
+    assert.deepEqual(f.repo.load(), before);
+  }
+  f.workshop.rename('creature-1', 'New name while fighting');
+  assert.deepEqual(f.repo.load(), f.workshop.state);
+});
+test('battle identities and claims must precede the saved serial and belong to this workshop', () => {
+  const f = fixture();
+  f.workshop.startBattle(
+    f.workshop.creatures.map((c) => c.id),
+    at,
+  );
+  for (const damage of [
+    (s) => (s.activeBattle.id = 'battle-999-1'),
+    (s) => (s.activeBattle.id = 'battle-42-2'),
+    (s) => (s.activeBattle.id = 'battle-42-01'),
+    (s) => (s.nextBattleSerial = 1),
+    (s) => (s.claimedBattles = ['battle-999-1']),
+    (s) => (s.claimedBattles = ['battle-42-2']),
+  ]) {
+    const state = f.workshop.state;
+    damage(state);
+    assert.throws(() => stateCodec(content).decode(state), /battle.*identity|battle.*serial/i);
+  }
+  f.workshop.retreatBattle();
+  f.workshop.claimBattle();
+  const claimed = f.workshop.state;
+  claimed.nextBattleSerial = 1;
+  assert.throws(() => stateCodec(content).decode(claimed), /battle.*identity|battle.*serial/i);
+  assert.deepEqual(f.repo.load(), f.workshop.state);
+});
+test('equivalent reordered JSON objects retain assignment biology and growth', () => {
+  const f = fixture();
+  f.workshop.startBattle(
+    f.workshop.creatures.map((c) => c.id),
+    at,
+  );
+  const imported = f.workshop.state;
+  const source = imported.activeBattle.units.find((u) => u.team === 'player').source;
+  source.genome = Object.fromEntries(
+    Object.entries(source.genome)
+      .reverse()
+      .map(([id, gene]) => [id, { dominance: gene.dominance, value: gene.value }]),
+  );
+  assert.deepEqual(stateCodec(content).decode(imported), imported);
+  f.workshop.importSave(JSON.stringify({ schemaVersion: 1, data: imported }));
+  assert.deepEqual(f.repo.load(), imported);
+});
 test('victory reward is claimed once, discovers wings and supports another manufacture', () => {
   const f = fixture(),
     ids = f.workshop.creatures.map((c) => c.id);

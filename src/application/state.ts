@@ -131,6 +131,51 @@ export function decodeOptions(value: unknown): Options {
     textScale: o.textScale as number,
   };
 }
+function sameSourceValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a))
+    return (
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((value, i) => sameSourceValue(value, b[i]))
+    );
+  if (a && b && typeof a === 'object' && typeof b === 'object' && !Array.isArray(b)) {
+    const left = a as Record<string, unknown>,
+      right = b as Record<string, unknown>,
+      keys = Object.keys(left);
+    return (
+      keys.length === Object.keys(right).length &&
+      keys.every((key) => Object.hasOwn(right, key) && sameSourceValue(left[key], right[key]))
+    );
+  }
+  return false;
+}
+function validateAssignmentSource(
+  source: CreatureSource,
+  habitat: CreatureSource[],
+  label: string,
+): CreatureSource {
+  const owned = habitat.find((c) => c.id === source.id);
+  if (!owned || owned.signature !== source.signature)
+    throw new DomainError(`${label} contains an unowned creature`);
+  for (const key of [
+    'generationVersion',
+    'seed',
+    'componentIds',
+    'genome',
+    'mutationIds',
+    'experience',
+    'level',
+    'training',
+    'equipment',
+    'createdAt',
+    'creator',
+    'lineage',
+  ] as const)
+    if (!sameSourceValue(owned[key], source[key]))
+      throw new DomainError(`${label} source does not match its owned creature`);
+  return owned;
+}
 export function stateCodec(content: ContentIndex): Codec<PlayerState> {
   return {
     decode(raw): PlayerState {
@@ -288,21 +333,32 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
         throw new DomainError('Every creature requires an experiment record');
       const claimedBattles = strings(s.claimedBattles, 'reward claims', 10000);
       unique(claimedBattles, 'reward claims');
+      const battleIdentity = (id: string): void => {
+        const prefix = `battle-${s.seedBase}-`;
+        if (!id.startsWith(prefix)) throw new DomainError('Invalid battle identity');
+        const serial = number(
+          Number(id.slice(prefix.length)),
+          'battle identity serial',
+          1,
+          (s.nextBattleSerial as number) - 1,
+          true,
+        );
+        if (id !== `${prefix}${serial}`) throw new DomainError('Invalid battle serial');
+      };
+      for (const id of claimedBattles) battleIdentity(id);
       // Phase 4 schema-1 saves migrate by adding an empty battle; creature provenance is unchanged.
       const activeBattle =
         s.activeBattle === undefined || s.activeBattle === null
           ? null
           : decodeBattle(s.activeBattle, content);
       if (activeBattle) {
+        battleIdentity(activeBattle.id);
         if (activeBattle.status === 'active' && currentActor(activeBattle)?.team !== 'player')
           throw new DomainError('Saved battle contains an unresolved enemy turn');
         if (claimedBattles.includes(activeBattle.id))
           throw new DomainError('Battle reward was already claimed');
         for (const unit of activeBattle.units.filter((u) => u.team === 'player'))
-          if (
-            !habitat.some((c) => c.id === unit.source.id && c.signature === unit.source.signature)
-          )
-            throw new DomainError('Battle squad contains an unowned creature');
+          validateAssignmentSource(unit.source, habitat, 'Battle');
       }
       // Additive migration: earlier schema-1 saves have no expedition fields.
       const nextExpeditionSerial = number(
@@ -362,19 +418,7 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
       for (const job of expeditions) {
         if (expeditionIdentity(job.id) !== job.serial || job.seed !== hash(job.id))
           throw new DomainError('Expedition provenance does not match');
-        const owned = habitat.find((c) => c.id === job.source.id);
-        if (!owned || owned.signature !== job.source.signature)
-          throw new DomainError('Expedition contains an unowned creature');
-        for (const key of [
-          'componentIds',
-          'genome',
-          'mutationIds',
-          'level',
-          'training',
-          'equipment',
-        ] as const)
-          if (JSON.stringify(owned[key]) !== JSON.stringify(job.source[key]))
-            throw new DomainError('Expedition source does not match its owned creature');
+        const owned = validateAssignmentSource(job.source, habitat, 'Expedition');
         if (
           expeditionRequirements(
             content.region(job.regionId),

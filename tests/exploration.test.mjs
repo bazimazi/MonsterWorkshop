@@ -141,6 +141,11 @@ test('imports reject replayed jobs, invalid ownership, forged snapshots and rewa
     (s) => s.expeditions.push(s.expeditions[0]),
     (s) => (s.expeditions[0].source.id = 'alien'),
     (s) => (s.expeditions[0].source.genome.adaptation.value = 100),
+    (s) => (s.expeditions[0].source.level = 100),
+    (s) => (s.expeditions[0].source.training.speed = 500),
+    (s) => (s.expeditions[0].source.experience = 100),
+    (s) => s.expeditions[0].source.seed++,
+    (s) => (s.expeditions[0].source.creator = 'Another engineer'),
     (s) => (s.expeditions[0].elapsedMs = 20001),
     (s) => s.expeditions[0].seed++,
     (s) => (s.resources.unknown = 1),
@@ -149,6 +154,12 @@ test('imports reject replayed jobs, invalid ownership, forged snapshots and rewa
     damage(s);
     assert.throws(() => stateCodec(content).decode(s));
   }
+  const reordered = w.state;
+  reordered.expeditions[0].source.genome = Object.fromEntries(
+    Object.entries(reordered.expeditions[0].source.genome).reverse(),
+  );
+  assert.deepEqual(stateCodec(content).decode(reordered), reordered);
+  w.rename(c.id, 'Renamed during the expedition');
   finish(w, job);
   for (const damage of [
     (s) => s.expeditions.push({ ...job, elapsedMs: 20000 }),

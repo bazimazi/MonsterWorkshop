@@ -183,3 +183,9 @@ Phases 8-12 add breeding, advanced combat, NPC economy, portable social exchange
 The UI rebuilds its HTML on actions, so rendering bookmarks the focused control using its stable data attributes and owning form. Selectors escape imported identifiers; only unique matches restore focus. Text fields retain their selection range. Keyed disclosures preserve expansion within the same screen. This transient presentation state does not enter saves or domain rules.
 
 Modal rendering limits restoration to the active dialog and cycles Tab at its boundaries. Closing a reveal restores the original opener or falls back to the page heading when that control is unavailable. Route changes explicitly focus their heading; a skip link reaches the same content without changing the hash route. Import/backup recovery clears modal return state along with other session selections.
+
+## Persistence recovery and source consistency
+
+The save adapter distinguishes missing keys from empty damaged records. Read failures are wrapped consistently, and load/import share envelope decoding. Before replacing the primary save, the adapter backs up only valid previous data; recovery therefore retains a usable backup even when the current record is damaged. An exact-byte validation cache avoids re-decoding unchanged primary data on each timer write. Successful loads establish this cache; writes replace it only after the primary save succeeds. Recovery export/restore/reset actions display failures and allow retry.
+
+Battle and expedition assignments bind snapshots to owned immutable source fields and current growth. Structural comparison ignores object-key order and retains array order; display names and history may differ without changing biology. Battle/claim identities use canonical workshop-seed serials below the next battle counter. These checks apply at the existing schema-1 boundary, with no save migration required.
