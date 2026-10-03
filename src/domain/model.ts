@@ -246,6 +246,29 @@ export interface Catalog {
   resources: Resource[];
   regions: Region[];
   research: ResearchNode[];
+  economy: {
+    offers: {
+      id: string;
+      type: 'component' | 'resource';
+      item: string;
+      quantity: number;
+      price: number;
+    }[];
+    recipes: { id: string; component: string; quantity: number; cost: Cost }[];
+    orders: {
+      id: string;
+      customer: string;
+      description: string;
+      tags: string[];
+      genes: Partial<Record<GeneId, number>>;
+      minimumStats: StatModifiers;
+      bonus: number;
+      resources: Record<string, number>;
+    }[];
+    saleRatio: number;
+    levelBonus: number;
+    mutationBonus: number;
+  };
   advanced: {
     reactions: {
       id: string;

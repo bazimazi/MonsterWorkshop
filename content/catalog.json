@@ -1248,5 +1248,277 @@
         "biomass": 65
       }
     ]
+  },
+  "economy": {
+    "saleRatio": 0.6,
+    "levelBonus": 2,
+    "mutationBonus": 3,
+    "offers": [
+      {
+        "id": "buy-dragon-head",
+        "type": "component",
+        "item": "dragon-head",
+        "quantity": 1,
+        "price": 12
+      },
+      {
+        "id": "buy-wolf-body",
+        "type": "component",
+        "item": "wolf-body",
+        "quantity": 1,
+        "price": 10
+      },
+      {
+        "id": "buy-spider-legs",
+        "type": "component",
+        "item": "spider-legs",
+        "quantity": 1,
+        "price": 12
+      },
+      {
+        "id": "buy-lightning-organ",
+        "type": "component",
+        "item": "lightning-organ",
+        "quantity": 1,
+        "price": 18
+      },
+      {
+        "id": "buy-crystal-armor",
+        "type": "component",
+        "item": "crystal-armor",
+        "quantity": 1,
+        "price": 14
+      },
+      {
+        "id": "buy-storm-wings",
+        "type": "component",
+        "item": "storm-wings",
+        "quantity": 1,
+        "price": 16
+      },
+      {
+        "id": "buy-herbal-organ",
+        "type": "component",
+        "item": "herbal-organ",
+        "quantity": 1,
+        "price": 14
+      },
+      {
+        "id": "buy-crystal-body",
+        "type": "component",
+        "item": "crystal-body",
+        "quantity": 1,
+        "price": 18
+      },
+      {
+        "id": "buy-gale-wings",
+        "type": "component",
+        "item": "gale-wings",
+        "quantity": 1,
+        "price": 16
+      },
+      {
+        "id": "buy-verdant-head",
+        "type": "component",
+        "item": "verdant-head",
+        "quantity": 1,
+        "price": 16
+      },
+      {
+        "id": "buy-prism-organ",
+        "type": "component",
+        "item": "prism-organ",
+        "quantity": 1,
+        "price": 18
+      },
+      {
+        "id": "buy-tide-organ",
+        "type": "component",
+        "item": "tide-organ",
+        "quantity": 1,
+        "price": 18
+      },
+      {
+        "id": "buy-fiber",
+        "type": "resource",
+        "item": "fiber",
+        "quantity": 3,
+        "price": 12
+      },
+      {
+        "id": "buy-crystal",
+        "type": "resource",
+        "item": "crystal",
+        "quantity": 3,
+        "price": 20
+      },
+      {
+        "id": "buy-storm-essence",
+        "type": "resource",
+        "item": "storm-essence",
+        "quantity": 3,
+        "price": 30
+      }
+    ],
+    "recipes": [
+      {
+        "id": "craft-dragon-head",
+        "component": "dragon-head",
+        "quantity": 1,
+        "cost": {
+          "biomass": 4,
+          "resources": {
+            "fiber": 2,
+            "crystal": 1
+          }
+        }
+      },
+      {
+        "id": "craft-wolf-body",
+        "component": "wolf-body",
+        "quantity": 1,
+        "cost": {
+          "biomass": 4,
+          "resources": {
+            "fiber": 2,
+            "crystal": 1
+          }
+        }
+      },
+      {
+        "id": "craft-spider-legs",
+        "component": "spider-legs",
+        "quantity": 1,
+        "cost": {
+          "biomass": 4,
+          "resources": {
+            "fiber": 2,
+            "crystal": 1
+          }
+        }
+      },
+      {
+        "id": "craft-lightning-organ",
+        "component": "lightning-organ",
+        "quantity": 1,
+        "cost": {
+          "biomass": 4,
+          "resources": {
+            "fiber": 2,
+            "crystal": 1
+          }
+        }
+      },
+      {
+        "id": "craft-crystal-armor",
+        "component": "crystal-armor",
+        "quantity": 1,
+        "cost": {
+          "biomass": 4,
+          "resources": {
+            "fiber": 2,
+            "crystal": 1
+          }
+        }
+      },
+      {
+        "id": "craft-storm-wings",
+        "component": "storm-wings",
+        "quantity": 1,
+        "cost": {
+          "biomass": 4,
+          "resources": {
+            "fiber": 2,
+            "crystal": 1
+          }
+        }
+      },
+      {
+        "id": "craft-herbal-organ",
+        "component": "herbal-organ",
+        "quantity": 1,
+        "cost": {
+          "biomass": 4,
+          "resources": {
+            "fiber": 2,
+            "crystal": 1
+          }
+        }
+      },
+      {
+        "id": "craft-crystal-body",
+        "component": "crystal-body",
+        "quantity": 1,
+        "cost": {
+          "biomass": 4,
+          "resources": {
+            "fiber": 2,
+            "crystal": 1
+          }
+        }
+      },
+      {
+        "id": "craft-gale-wings",
+        "component": "gale-wings",
+        "quantity": 1,
+        "cost": {
+          "biomass": 4,
+          "resources": {
+            "fiber": 2,
+            "crystal": 1
+          }
+        }
+      }
+    ],
+    "orders": [
+      {
+        "id": "field-assistant",
+        "customer": "Botanist Iona",
+        "description": "An agile companion for mapping the meadow.",
+        "tags": ["mammal"],
+        "genes": {
+          "adaptation": 25
+        },
+        "minimumStats": {
+          "speed": 20
+        },
+        "bonus": 20,
+        "resources": {
+          "fiber": 2
+        }
+      },
+      {
+        "id": "storm-carrier",
+        "customer": "Explorer Arlo",
+        "description": "A flying carrier that can cross the storm ridge.",
+        "tags": ["flyer"],
+        "genes": {
+          "strength": 30
+        },
+        "minimumStats": {
+          "hp": 80
+        },
+        "bonus": 35,
+        "resources": {
+          "crystal": 2
+        }
+      },
+      {
+        "id": "lab-conductor",
+        "customer": "Researcher Ren",
+        "description": "Electric biology in a sturdy, insulated frame.",
+        "tags": ["electric", "defender"],
+        "genes": {
+          "vitality": 30
+        },
+        "minimumStats": {
+          "defense": 15
+        },
+        "bonus": 28,
+        "resources": {
+          "storm-essence": 1
+        }
+      }
+    ]
   }
 }

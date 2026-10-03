@@ -344,6 +344,42 @@ export function decodeCatalog(raw: unknown): Catalog {
     number(b.phaseAt, 'boss threshold', 0.1, 0.9);
     for (const key of ['shield', 'regeneration', 'biomass']) number(b[key], key, 1, 1000, true);
   }
+  const economy = record(c.economy, 'economy');
+  number(economy.saleRatio, 'sale ratio', 0.1, 0.8);
+  number(economy.levelBonus, 'level bonus', 0, 10, true);
+  number(economy.mutationBonus, 'mutation bonus', 0, 10, true);
+  for (const offer of table(economy.offers, 'market offers')) {
+    member(offer.type, ['component', 'resource'], 'offer type');
+    references([offer.item], offer.type === 'component' ? componentIds : resourceIds, 'offer item');
+    number(offer.quantity, 'offer quantity', 1, 100, true);
+    number(offer.price, 'offer price', 1, 1000, true);
+  }
+  for (const recipe of table(economy.recipes, 'crafting recipes')) {
+    references([recipe.component], componentIds, 'crafted component');
+    number(recipe.quantity, 'crafted quantity', 1, 100, true);
+    validateCost(recipe.cost, resourceIds);
+  }
+  const orders = table(economy.orders, 'NPC orders');
+  if (!orders.length) throw new DomainError('At least one NPC request is required');
+  for (const order of orders) {
+    string(order.customer, 'customer');
+    string(order.description, 'order description');
+    strings(order.tags, 'order biology');
+    references(
+      order.tags,
+      new Set(components.flatMap((p) => p.tags as string[])),
+      'request biology',
+    );
+    modifiers(order.genes, GENES, 'order genes');
+    for (const n of Object.values(order.genes as Record<string, number>))
+      number(n, 'required gene', 0, 100, true);
+    modifiers(order.minimumStats, STAT_KEYS, 'order stats');
+    number(order.bonus, 'order bonus', 1, 1000, true);
+    for (const [id, n] of Object.entries(record(order.resources, 'order resources'))) {
+      references([id], resourceIds, 'order resource');
+      number(n, 'order reward', 1, 100, true);
+    }
+  }
   return structuredClone(c) as unknown as Catalog;
 }
 function validateCost(raw: unknown, resourceIds: Set<string>): void {

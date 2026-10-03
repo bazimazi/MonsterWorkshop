@@ -1,5 +1,37 @@
 import { test, expect } from '@playwright/test';
 import { fullResearchWorkshop } from '../helpers/research-workshop.mjs';
+test('market purchases and crafting persist; NPC delivery frees habitat and keeps journal', async ({
+  page,
+}) => {
+  const { w } = fullResearchWorkshop();
+  await page.goto('/#settings');
+  await page.getByLabel('Import save', { exact: true }).setInputFiles({
+    name: 'market.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(w.exportSave()),
+  });
+  await expect(page.getByRole('status')).toContainText('imported');
+  await page.getByRole('link', { name: 'Marketplace', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Market supply' }).selectOption('buy-fiber');
+  await page.getByRole('button', { name: 'Buy supply' }).click();
+  await page.getByRole('button', { name: 'Craft sample' }).click();
+  await page.screenshot({
+    path: `artifacts/market-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+  await page.getByRole('button', { name: 'Deliver creature' }).click();
+  await expect(page.getByText('REQUEST #2', { exact: true })).toBeVisible();
+  const saved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('monster-workshop.save')).data,
+  );
+  expect(saved.sales).toHaveLength(1);
+  expect(saved.experiments).toHaveLength(w.state.experiments.length);
+  await page.reload();
+  await expect(page.getByText('REQUEST #2', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Creatures', exact: true }).click();
+  await expect(page.locator('.creature-card')).toHaveCount(w.creatures.length - 1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
 test('challenge arena starts a modifier tower battle and retreat preserves the floor', async ({
   page,
 }) => {

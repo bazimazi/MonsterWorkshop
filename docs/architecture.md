@@ -137,3 +137,10 @@ Optional lineage retains parent identities/names, generation and each gene's sou
 ## Advanced combat architecture
 
 An optional challenge profile preserves beginner battle semantics. Challenge stat reconstruction includes team tag bonuses, tower scaling, modifiers and boss phase state. Reactions consume a prerequisite status before applying damage amplification and a new status. Frozen actors skip one own turn while duration/cooldowns still advance. Boss phases trigger once at a configured health threshold. Tower floors advance only in the unique victory-claim transaction; boss victories and discoveries persist separately. Catalog validation covers every rule/reference; battle decoding reconstructs stats and validates advanced status bounds.
+
+
+## Economy architecture
+
+The initial marketplace is an offline NPC economy using biomass and the existing three materials. Offers replenish discovered parts without granting knowledge; recipes consume resources for known anatomy. A rotating request sequence checks component tags, gene thresholds and stats. Delivery pays a sale quote plus an explicit request bonus and materials. Ordinary level-one resale is below manufacturing cost, and purchasing materials cannot create an immediate resale profit. Level/history rewards compensate gameplay, not repeated purchase/resale.
+
+A unique sales ledger removes specimens from the active habitat while preserving their sources, experiments, expedition reports and family snapshots. Sold creatures cannot be assigned, bred or renamed. The last companion, assigned creatures and resting parents cannot be sold. Habitat capacity counts active specimens; archive validation allows up to 10,000 records. Order serials must be consecutive and payouts reconstruct from archived biology. Every operation shares transactional persistence and failed-write rollback.

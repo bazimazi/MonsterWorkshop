@@ -26,6 +26,8 @@ import { decodeScan, hasResearch, researchRequirements, scannerLevel } from '../
 import type { Scan, ResearchProgress } from '../domain/research.js';
 import { breedCreature } from '../domain/breeding.js';
 import type { Birth } from '../domain/breeding.js';
+import { orderAt, orderRequirements, salePrice } from '../domain/economy.js';
+import type { Sale } from '../domain/economy.js';
 export interface Options {
   sound: boolean;
   haptics: boolean;
@@ -67,6 +69,7 @@ export interface PlayerState {
   breedingCooldowns: Record<string, number>;
   towerFloor: number;
   bossVictories: string[];
+  sales: Sale[];
 }
 export function initialState(content: ContentIndex, seed: number): PlayerState {
   const starter = content.catalog.components.filter((p) => p.discovery === 'starter');
@@ -97,6 +100,7 @@ export function initialState(content: ContentIndex, seed: number): PlayerState {
     breedingCooldowns: {},
     towerFloor: 1,
     bossVictories: [],
+    sales: [],
   };
 }
 export function decodeOptions(value: unknown): Options {
@@ -149,11 +153,9 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
       unique(mutations, 'mutation discoveries');
       for (const id of mutations)
         if (!content.mutations.has(id)) throw new DomainError('Unknown mutation discovery');
-      const creatures = list(
-        s.creatures,
-        'creatures',
-        content.catalog.rules.workshop.maxCreatures,
-      ).map((c) => decodeCreature(c, content));
+      const creatures = list(s.creatures, 'creatures', 10000).map((c) =>
+        decodeCreature(c, content),
+      );
       unique(
         creatures.map((c) => c.id),
         'creature identities',
@@ -164,11 +166,48 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
           c.mutationIds.some((id) => !mutations.includes(id))
         )
           throw new DomainError('Creature has an unrecorded discovery');
-      const experiments = list(
-        s.experiments,
-        'experiments',
-        content.catalog.rules.workshop.maxCreatures,
-      ).map((rawExperiment) => {
+      const sales = list(s.sales ?? [], 'creature sales', creatures.length).map((raw) => {
+        const sale = record(raw, 'sale'),
+          creatureId = string(sale.creatureId, 'sold creature');
+        const source = creatures.find((c) => c.id === creatureId);
+        if (!source) throw new DomainError('Sale references an unknown creature');
+        const c = deriveCreature(source, content);
+        const orderSerial =
+          sale.orderSerial === null
+            ? null
+            : number(sale.orderSerial, 'order serial', 1, 10000, true);
+        const order = orderSerial ? orderAt(orderSerial, content) : null;
+        if (order && orderRequirements(order, c, content).length)
+          throw new DomainError('Delivered creature does not satisfy the request');
+        const expected = {
+          biomass: salePrice(c, content) + (order?.bonus ?? 0),
+          resources: order?.resources ?? {},
+        };
+        if (
+          sale.biomass !== expected.biomass ||
+          JSON.stringify(sale.resources) !== JSON.stringify(expected.resources)
+        )
+          throw new DomainError('Incorrect sale reward');
+        return { creatureId, orderSerial, ...expected };
+      });
+      unique(
+        sales.map((sale) => sale.creatureId),
+        'sales',
+      );
+      const serials = sales
+        .filter((sale) => sale.orderSerial !== null)
+        .map((sale) => sale.orderSerial!)
+        .sort((a, b) => a - b);
+      if (serials.some((serial, i) => serial !== i + 1))
+        throw new DomainError('Invalid request progression');
+      const sold = new Set(sales.map((sale) => sale.creatureId));
+      const habitat = creatures.filter((c) => !sold.has(c.id));
+      if (
+        habitat.length > content.catalog.rules.workshop.maxCreatures ||
+        (creatures.length && !habitat.length)
+      )
+        throw new DomainError('Invalid habitat capacity');
+      const experiments = list(s.experiments, 'experiments', 10000).map((rawExperiment) => {
         const e = record(rawExperiment, 'experiment');
         number(e.serial, 'experiment serial', 1, (s.nextSerial as number) - 1, true);
         string(e.creatureId, 'experiment creature');
@@ -226,7 +265,7 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
           throw new DomainError('Battle reward was already claimed');
         for (const unit of activeBattle.units.filter((u) => u.team === 'player'))
           if (
-            !creatures.some((c) => c.id === unit.source.id && c.signature === unit.source.signature)
+            !habitat.some((c) => c.id === unit.source.id && c.signature === unit.source.signature)
           )
             throw new DomainError('Battle squad contains an unowned creature');
       }
@@ -288,7 +327,7 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
       for (const job of expeditions) {
         if (expeditionIdentity(job.id) !== job.serial || job.seed !== hash(job.id))
           throw new DomainError('Expedition provenance does not match');
-        const owned = creatures.find((c) => c.id === job.source.id);
+        const owned = habitat.find((c) => c.id === job.source.id);
         if (!owned || owned.signature !== job.source.signature)
           throw new DomainError('Expedition contains an unowned creature');
         for (const key of [
@@ -452,6 +491,7 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
         breedingCooldowns,
         towerFloor,
         bossVictories,
+        sales,
       }) as PlayerState;
     },
   };

@@ -4,6 +4,7 @@ import { ContentIndex, decodeCatalog } from '../dist/src/domain/catalog.js';
 import { generateCreature, validateAnatomy } from '../dist/src/domain/generator.js';
 import { chooseAction, createBattle, resolveAction } from '../dist/src/domain/combat.js';
 import { renderCreature } from '../dist/src/presentation/creature.js';
+import { orderAt, orderRequirements } from '../dist/src/domain/economy.js';
 import { Workshop } from '../dist/src/application/workshop.js';
 import { stateCodec } from '../dist/src/application/state.js';
 import { SaveRepository } from '../dist/src/platform/save.js';
@@ -131,6 +132,16 @@ else if (command === 'generate' || command === 'validate') {
       for (let day = 0; day < days; day++)
         for (let session = 0; session < sessions; session++) {
           victories += win(workshop) ? 1 : 0;
+          if (workshop.creatures.length > 5) {
+            const order = orderAt(workshop.orderSerial, content);
+            const matching = workshop.creatures.find(
+              (c) => !orderRequirements(order, c, content).length,
+            );
+            workshop.sell((matching ?? workshop.creatures.at(-1)).id, !!matching);
+          }
+          if (workshop.state.resources.fiber >= 2 && workshop.state.resources.crystal >= 1)
+            workshop.craft('craft-dragon-head');
+          if (profile === 'collector') workshop.buy('buy-fiber');
           if (workshop.creatures.length < content.catalog.rules.workshop.maxCreatures) {
             try {
               workshop.manufacture(
@@ -151,6 +162,8 @@ else if (command === 'generate' || command === 'validate') {
         victories,
         creatures: workshop.creatures.length,
         biomass: workshop.state.biomass,
+        sales: workshop.state.sales.length,
+        requests: workshop.orderSerial - 1,
         lowestStock: Math.min(...Object.values(workshop.state.inventory)),
         blocked,
       });

@@ -32,6 +32,8 @@ import {
 import type { ResearchProgress, Scan } from '../domain/research.js';
 import { breedCreature } from '../domain/breeding.js';
 import type { Challenge } from '../domain/challenges.js';
+import { orderAt, orderRequirements, salePrice } from '../domain/economy.js';
+import type { Sale } from '../domain/economy.js';
 export interface BattleReward {
   victory: boolean;
   biomass: number;
@@ -55,7 +57,60 @@ export class Workshop {
     return structuredClone(this.value);
   }
   get creatures(): Creature[] {
-    return this.value.creatures.map((c) => deriveCreature(c, this.content));
+    const sold = new Set(this.value.sales.map((sale) => sale.creatureId));
+    return this.value.creatures
+      .filter((c) => !sold.has(c.id))
+      .map((c) => deriveCreature(c, this.content));
+  }
+  get orderSerial(): number {
+    return this.value.sales.filter((sale) => sale.orderSerial !== null).length + 1;
+  }
+  buy(id: string): void {
+    const offer = this.content.catalog.economy.offers.find((o) => o.id === id);
+    if (!offer) throw new DomainError('Unknown market offer');
+    if (offer.type === 'component' && !this.value.discoveredComponents.includes(offer.item))
+      throw new DomainError('Discover this biology before buying samples');
+    this.transact((next) => {
+      this.spend(next, { biomass: offer.price, resources: {} });
+      const stock = offer.type === 'component' ? next.inventory : next.resources;
+      stock[offer.item] = (stock[offer.item] ?? 0) + offer.quantity;
+    });
+  }
+  craft(id: string): void {
+    const recipe = this.content.catalog.economy.recipes.find((r) => r.id === id);
+    if (!recipe) throw new DomainError('Unknown crafting recipe');
+    if (!this.value.discoveredComponents.includes(recipe.component))
+      throw new DomainError('Discover this biology before crafting');
+    this.transact((next) => {
+      this.spend(next, recipe.cost);
+      next.inventory[recipe.component] = (next.inventory[recipe.component] ?? 0) + recipe.quantity;
+    });
+  }
+  sell(id: string, deliver = false): Sale {
+    const c = this.creatures.find((c) => c.id === id);
+    if (!c) throw new DomainError('Choose an owned creature');
+    if (this.creatures.length < 2)
+      throw new DomainError('Keep at least one creature for exploration');
+    if (this.isAssigned(id) || (this.value.breedingCooldowns[id] ?? 0) > 0)
+      throw new DomainError('Assigned or resting creatures cannot leave the habitat');
+    const orderSerial = deliver ? this.orderSerial : null;
+    const order = orderSerial ? orderAt(orderSerial, this.content) : null;
+    const reasons = order ? orderRequirements(order, c, this.content) : [];
+    if (reasons.length) throw new DomainError(reasons.join(' '));
+    const sale: Sale = {
+      creatureId: id,
+      orderSerial,
+      biomass: salePrice(c, this.content) + (order?.bonus ?? 0),
+      resources: structuredClone(order?.resources ?? {}),
+    };
+    this.transact((next) => {
+      next.biomass += sale.biomass;
+      for (const [id, n] of Object.entries(sale.resources))
+        next.resources[id] = (next.resources[id] ?? 0) + n;
+      next.sales.push(sale);
+    });
+    this.analytics.track(deliver ? 'order_delivered' : 'creature_sold', { biomass: sale.biomass });
+    return sale;
   }
   isAssigned(id: string): boolean {
     return (
@@ -245,13 +300,13 @@ export class Workshop {
     date(at, 'birth time');
     if (parentA === parentB) throw new DomainError('Choose two different parents');
     const parents = [parentA, parentB].map((id) => {
-      const parent = this.value.creatures.find((c) => c.id === id);
+      const parent = this.creatures.find((c) => c.id === id);
       if (!parent) throw new DomainError('Choose owned parents');
       if (this.isAssigned(id) || (this.value.breedingCooldowns[id] ?? 0) > 0)
         throw new DomainError('This parent is assigned or resting');
-      return parent;
+      return decodeCreature(parent, this.content);
     });
-    if (this.value.creatures.length >= this.content.catalog.rules.workshop.maxCreatures)
+    if (this.creatures.length >= this.content.catalog.rules.workshop.maxCreatures)
       throw new DomainError('Your habitat is full');
     const serial = this.value.nextSerial,
       seed = hash(`${this.value.seedBase}:birth:${serial}`);
@@ -307,7 +362,7 @@ export class Workshop {
       throw new DomainError('Research mutation control and discover this mutation first');
     const cost = this.cost(ids) + controlCost.biomass,
       state = this.value;
-    if (state.creatures.length >= this.content.catalog.rules.workshop.maxCreatures)
+    if (this.creatures.length >= this.content.catalog.rules.workshop.maxCreatures)
       throw new DomainError('Your habitat is full');
     if (cost > state.biomass)
       throw new DomainError('Not enough biomass. Complete a simulator battle to replenish it.');
@@ -356,6 +411,7 @@ export class Workshop {
   }
   rename(id: string, name: string): void {
     const trimmed = string(name.trim(), 'name', 40);
+    if (!this.creatures.some((c) => c.id === id)) throw new DomainError('Choose an owned creature');
     this.transact((next) => {
       const c = next.creatures.find((c) => c.id === id);
       if (!c) throw new DomainError('Creature not found');

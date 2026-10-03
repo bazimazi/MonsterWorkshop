@@ -12,6 +12,7 @@ import { escape, title } from './html.js';
 import { availableAbilities, canUse, currentActor } from '../domain/combat.js';
 import type { Battle, Combatant } from '../domain/combat.js';
 import { deriveCreature } from '../domain/generator.js';
+import { marketView } from './market.js';
 import { challengesView } from './challenges.js';
 import type { Challenge } from '../domain/challenges.js';
 import { breedingView } from './breeding.js';
@@ -63,6 +64,9 @@ export class GameUI {
   private explorerId: string | undefined;
   private lastTick = performance.now();
   private clockFailed = false;
+  private marketOffer: string | undefined;
+  private marketRecipe: string | undefined;
+  private marketCreature: string | undefined;
   private challengeModifier: Challenge['modifier'] = 'none';
   private parents: [string | undefined, string | undefined] = [undefined, undefined];
   private scannerId = 'dragon-head';
@@ -131,7 +135,7 @@ export class GameUI {
           Object.entries(rules.cost.resources).some(
             ([id, n]) => (current.resources[id] ?? 0) < n,
           ) ||
-          current.creatures.length >= this.content.catalog.rules.workshop.maxCreatures;
+          this.workshop.creatures.length >= this.content.catalog.rules.workshop.maxCreatures;
       }
       for (const job of current.expeditions) {
         const card = this.root.querySelector<HTMLElement>(`[data-job="${job.id}"]`);
@@ -178,30 +182,38 @@ export class GameUI {
       this.controlledMutation = undefined;
     const screen = this.nav.current;
     const body =
-      screen === 'challenges'
-        ? challengesView(this.workshop, [...this.squad], this.challengeModifier)
-        : screen === 'breeding'
-          ? breedingView(this.workshop, ...this.parents)
-          : screen === 'research'
-            ? researchView(
-                state,
-                this.workshop,
-                this.content,
-                state.discoveredComponents.includes(this.scannerId)
-                  ? this.scannerId
-                  : state.discoveredComponents[0]!,
-              )
-            : screen === 'explore'
-              ? explorationView(state, this.workshop, this.content, this.regionId, this.explorerId)
-              : screen === 'creatures'
-                ? this.creaturesView(state)
-                : screen === 'battle'
-                  ? this.battleView(state)
-                  : screen === 'journal'
-                    ? this.journalView(state)
-                    : screen === 'settings'
-                      ? this.settingsView(state)
-                      : this.workshopView(state);
+      screen === 'market'
+        ? marketView(this.workshop, this.marketOffer, this.marketRecipe, this.marketCreature)
+        : screen === 'challenges'
+          ? challengesView(this.workshop, [...this.squad], this.challengeModifier)
+          : screen === 'breeding'
+            ? breedingView(this.workshop, ...this.parents)
+            : screen === 'research'
+              ? researchView(
+                  state,
+                  this.workshop,
+                  this.content,
+                  state.discoveredComponents.includes(this.scannerId)
+                    ? this.scannerId
+                    : state.discoveredComponents[0]!,
+                )
+              : screen === 'explore'
+                ? explorationView(
+                    state,
+                    this.workshop,
+                    this.content,
+                    this.regionId,
+                    this.explorerId,
+                  )
+                : screen === 'creatures'
+                  ? this.creaturesView(state)
+                  : screen === 'battle'
+                    ? this.battleView(state)
+                    : screen === 'journal'
+                      ? this.journalView(state)
+                      : screen === 'settings'
+                        ? this.settingsView(state)
+                        : this.workshopView(state);
     const tabs: [Screen, string, string][] = [
       ['workshop', 'Workshop', '⚗'],
       ['creatures', 'Creatures', '◈'],
@@ -209,7 +221,7 @@ export class GameUI {
       ['research', 'Research', '⌕'],
       ['explore', 'Explore', '❧'],
     ];
-    this.root.innerHTML = `<header class="topbar"><a class="brand" href="#workshop"><img src="./icon.svg" alt="" width="36" height="36"><span>MONSTER<span class="brand-light">WORKSHOP</span></span></a><div class="resource"><span class="resource-dot" aria-hidden="true"></span><strong>${state.biomass}</strong><span>biomass</span></div><div class="utility-links"><a class="utility-link" href="#journal" aria-label="Journal">&#8801;</a><a class="utility-link" href="#settings" aria-label="Settings">&#9881;</a></div></header><nav class="navigation" aria-label="Main navigation">${tabs.map(([key, label, symbol]) => `<a href="#${key}" ${screen === key ? 'aria-current="page"' : ''}><span aria-hidden="true">${symbol}</span>${label}${key === 'creatures' ? `<small aria-hidden="true">${state.creatures.length}</small>` : ''}</a>`).join('')}</nav><main class="shell game-shell">${this.notice ? `<div class="notice ${this.isError ? 'error' : ''}" role="${this.isError ? 'alert' : 'status'}">${escape(this.notice)}<button class="quiet" data-action="dismiss" aria-label="Dismiss message">×</button></div>` : ''}${body}</main><footer class="footer">A little science. A little strange. <span>Saved on this device</span></footer>${this.modal()}`;
+    this.root.innerHTML = `<header class="topbar"><a class="brand" href="#workshop"><img src="./icon.svg" alt="" width="36" height="36"><span>MONSTER<span class="brand-light">WORKSHOP</span></span></a><div class="resource"><span class="resource-dot" aria-hidden="true"></span><strong>${state.biomass}</strong><span>biomass</span></div><div class="utility-links"><a class="utility-link" href="#market" aria-label="Marketplace">&#9878;</a><a class="utility-link" href="#journal" aria-label="Journal">&#8801;</a><a class="utility-link" href="#settings" aria-label="Settings">&#9881;</a></div></header><nav class="navigation" aria-label="Main navigation">${tabs.map(([key, label, symbol]) => `<a href="#${key}" ${screen === key ? 'aria-current="page"' : ''}><span aria-hidden="true">${symbol}</span>${label}${key === 'creatures' ? `<small aria-hidden="true">${this.workshop.creatures.length}</small>` : ''}</a>`).join('')}</nav><main class="shell game-shell">${this.notice ? `<div class="notice ${this.isError ? 'error' : ''}" role="${this.isError ? 'alert' : 'status'}">${escape(this.notice)}<button class="quiet" data-action="dismiss" aria-label="Dismiss message">×</button></div>` : ''}${body}</main><footer class="footer">A little science. A little strange. <span>Saved on this device</span></footer>${this.modal()}`;
     const dialog = this.root.querySelector<HTMLDialogElement>('dialog');
     if (dialog) {
       dialog.showModal();
@@ -280,21 +292,21 @@ export class GameUI {
       cost <= state.biomass &&
       !controlReasons.length &&
       [...this.selected].every((id) => (state.inventory[id] ?? 0) > 0) &&
-      state.creatures.length < this.content.catalog.rules.workshop.maxCreatures;
+      this.workshop.creatures.length < this.content.catalog.rules.workshop.maxCreatures;
     const blockedReason = controlReasons.length
       ? controlReasons.join(' ')
       : !creature
         ? 'Choose a head and body to complete the anatomy.'
-        : state.creatures.length >= this.content.catalog.rules.workshop.maxCreatures
+        : this.workshop.creatures.length >= this.content.catalog.rules.workshop.maxCreatures
           ? `Your habitat is full (${this.content.catalog.rules.workshop.maxCreatures} specimens). Export your discoveries in Settings.`
           : cost > state.biomass
             ? 'Not enough biomass. Win a simulator battle to replenish it.'
             : 'A selected part is out of stock. Win a simulator battle to replenish it.';
     const guidance =
-      state.creatures.length === 0
+      this.workshop.creatures.length === 0
         ? 'Start with a head and body. Add an organ, then bring your idea to life.'
-        : state.creatures.length < 3
-          ? `Your habitat has ${state.creatures.length} creature${state.creatures.length === 1 ? '' : 's'}. Build a squad of three to enter the simulator.`
+        : this.workshop.creatures.length < 3
+          ? `Your habitat has ${this.workshop.creatures.length} creature${this.workshop.creatures.length === 1 ? '' : 's'}. Build a squad of three to enter the simulator.`
           : state.discoveredComponents.length > 5
             ? 'New biology recovered. Try adding your discovery to a fresh design.'
             : 'Your squad is ready. <a href="#battle">Test your inventions in a 3v3 battle →</a>';
@@ -309,11 +321,11 @@ export class GameUI {
         '',
       )}</div><div class="forecast"><div><span>Compatibility</span><strong>${creature ? creature.compatibility.score + '%' : '—'}</strong></div><div class="meter"><span style="width:${creature?.compatibility.score ?? 0}%"></span></div><div><span>${creature?.compatibility.tier ?? 'Incomplete anatomy'}</span><span class="mutation-hint">Mutation potential ${mutationForecast}</span></div></div>${creature?.compatibility.reasons.length ? `<details class="interactions"><summary>Genetic interactions · ${creature.compatibility.reasons.length}</summary><ul>${creature.compatibility.reasons.map((r) => `<li>${escape(r)}</li>`).join('')}</ul></details>` : ''}${controlAvailable ? `<label class="controlled-picker">Mutation guidance<select aria-label="Mutation guidance" data-controlled-mutation="true"><option value="">Natural experiment</option>${state.discoveredMutations.map((id) => `<option value="${id}" ${this.controlledMutation === id ? 'selected' : ''}>${escape(this.content.mutations.get(id)!.name)}</option>`).join('')}</select></label><p class="micro">Guided creation adds ${escape(describeCost(this.content.catalog.rules.research.controlledMutationCost, this.content))}. Required biology still applies.</p>${controlReasons.map((r) => `<p class="micro requirement">${escape(r)}</p>`).join('')}` : ''}<button class="primary manufacture" data-action="manufacture" ${!enough ? 'disabled' : ''}><span>✦ Manufacture creature</span><span>${cost} biomass</span></button>${!enough ? `<p class="micro">${escape(blockedReason)}</p>` : '<p class="micro">Consumes one of each selected part. No two genomes are quite alike.</p>'}</section></div>`;
   }
-  private creaturesView(state: PlayerState): string {
+  private creaturesView(_state: PlayerState): string {
     const all = this.workshop.creatures,
       creatures = all.filter((c) => this.filter !== 'mutated' || c.mutationIds.length > 0);
     const selected = all.find((c) => c.id === this.inspectedId);
-    return `<div class="page-heading"><div><p class="eyebrow">YOUR LIVING INVENTIONS</p><a class="secondary" href="#breeding">Breeding nursery</a><h1 tabindex="-1">The habitat</h1><p class="muted">${state.creatures.length} / ${this.content.catalog.rules.workshop.maxCreatures} specimens · Made by you.</p></div><label class="filter-label">Show <select data-filter="true" aria-label="Filter creatures"><option value="all" ${this.filter === 'all' ? 'selected' : ''}>All creatures</option><option value="mutated" ${this.filter === 'mutated' ? 'selected' : ''}>Mutated creatures</option></select></label></div>${!all.length ? '<section class="panel empty"><h2>Your first invention belongs here.</h2><p class="muted">Build something curious in the creation chamber.</p><a class="primary" href="#workshop">Start an experiment</a></section>' : `<div class="creature-grid">${creatures.map((c) => `<button class="panel creature-card" data-action="inspect" data-id="${escape(c.id)}">${renderCreature(c, this.content, false)}<strong>${escape(c.name)}</strong><span class="card-meta">${title(c.element)} · ${title(c.quality)} · Lv ${c.level}</span><span class="tag ${c.mutationIds.length ? 'gold' : ''}">${c.mutationIds.length ? '✦ MUTATED' : c.roles.map(title).join(' / ')}</span></button>`).join('')}</div>${!creatures.length ? '<p class="muted">No mutations discovered yet. Try an electric component.</p>' : ''}`}${
+    return `<div class="page-heading"><div><p class="eyebrow">YOUR LIVING INVENTIONS</p><a class="secondary" href="#breeding">Breeding nursery</a><h1 tabindex="-1">The habitat</h1><p class="muted">${this.workshop.creatures.length} / ${this.content.catalog.rules.workshop.maxCreatures} specimens · Made by you.</p></div><label class="filter-label">Show <select data-filter="true" aria-label="Filter creatures"><option value="all" ${this.filter === 'all' ? 'selected' : ''}>All creatures</option><option value="mutated" ${this.filter === 'mutated' ? 'selected' : ''}>Mutated creatures</option></select></label></div>${!all.length ? '<section class="panel empty"><h2>Your first invention belongs here.</h2><p class="muted">Build something curious in the creation chamber.</p><a class="primary" href="#workshop">Start an experiment</a></section>' : `<div class="creature-grid">${creatures.map((c) => `<button class="panel creature-card" data-action="inspect" data-id="${escape(c.id)}">${renderCreature(c, this.content, false)}<strong>${escape(c.name)}</strong><span class="card-meta">${title(c.element)} · ${title(c.quality)} · Lv ${c.level}</span><span class="tag ${c.mutationIds.length ? 'gold' : ''}">${c.mutationIds.length ? '✦ MUTATED' : c.roles.map(title).join(' / ')}</span></button>`).join('')}</div>${!creatures.length ? '<p class="muted">No mutations discovered yet. Try an electric component.</p>' : ''}`}${
       selected
         ? `<section class="panel specimen-detail" id="specimen-detail"><div class="section-title"><h2>${escape(selected.name)}</h2><span class="tag">SPECIMEN ${escape(selected.id)}</span></div>${this.stats(selected)}<form data-rename="${escape(selected.id)}" class="rename-form"><label>Name your creation<input name="name" maxlength="40" required value="${escape(selected.name)}"></label><button class="secondary" type="submit">Save name</button></form><div class="detail-grid"><div><h3>Genome</h3>${GENES.map((id) => `<div class="gene-row"><span>${title(id)}</span><meter min="0" max="100" value="${selected.genome[id].value}" aria-label="${id}"></meter><strong>${selected.genome[id].value}</strong></div>`).join('')}</div><div><h3>Abilities</h3>${selected.abilityIds
             .map((id) => {
@@ -478,6 +490,22 @@ export class GameUI {
   }
   private async act(action: string, button: HTMLElement): Promise<void> {
     this.isError = false;
+    if (action === 'market-buy') {
+      this.workshop.buy(button.dataset.id!);
+      this.notice = 'Supplies purchased.';
+      this.render();
+    }
+    if (action === 'market-craft') {
+      this.workshop.craft(button.dataset.id!);
+      this.notice = 'Biological sample crafted.';
+      this.render();
+    }
+    if (action === 'market-sell' || action === 'market-deliver') {
+      const sale = this.workshop.sell(button.dataset.id!, action === 'market-deliver');
+      this.squad.delete(sale.creatureId);
+      this.notice = `Creature transferred. +${sale.biomass} biomass.`;
+      this.render();
+    }
     if (action === 'part') {
       const id = button.dataset.part!;
       if (this.selected.has(id)) this.selected.delete(id);
@@ -676,6 +704,18 @@ export class GameUI {
     }
   }
   private async change(input: HTMLInputElement): Promise<void> {
+    if (input.dataset.marketOffer) {
+      this.marketOffer = input.value;
+      this.render();
+    }
+    if (input.dataset.marketRecipe) {
+      this.marketRecipe = input.value;
+      this.render();
+    }
+    if (input.dataset.marketCreature) {
+      this.marketCreature = input.value;
+      this.render();
+    }
     if (input.dataset.challengeModifier)
       this.challengeModifier = input.value as Challenge['modifier'];
     if (input.dataset.parent !== undefined) {
