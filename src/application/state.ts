@@ -65,6 +65,8 @@ export interface PlayerState {
   scans: Scan[];
   births: Birth[];
   breedingCooldowns: Record<string, number>;
+  towerFloor: number;
+  bossVictories: string[];
 }
 export function initialState(content: ContentIndex, seed: number): PlayerState {
   const starter = content.catalog.components.filter((p) => p.discovery === 'starter');
@@ -93,6 +95,8 @@ export function initialState(content: ContentIndex, seed: number): PlayerState {
     scans: [],
     births: [],
     breedingCooldowns: {},
+    towerFloor: 1,
+    bossVictories: [],
   };
 }
 export function decodeOptions(value: unknown): Options {
@@ -413,6 +417,16 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
       );
       if (creatures.filter((c) => c.lineage).length !== births.length)
         throw new DomainError('Missing birth record');
+      const towerFloor = number(s.towerFloor ?? 1, 'tower floor', 1, 1000000, true);
+      const bossVictories = strings(
+        s.bossVictories ?? [],
+        'boss victories',
+        content.catalog.advanced.bosses.length,
+      );
+      unique(bossVictories, 'boss victories');
+      for (const id of bossVictories)
+        if (!content.catalog.advanced.bosses.some((b) => b.id === id))
+          throw new DomainError('Unknown defeated boss');
       return structuredClone({
         contentVersion: s.contentVersion,
         playerName: s.playerName,
@@ -436,6 +450,8 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
         scans,
         births,
         breedingCooldowns,
+        towerFloor,
+        bossVictories,
       }) as PlayerState;
     },
   };

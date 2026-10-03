@@ -94,7 +94,7 @@ Rules evaluate tags rather than hard-coded recipes. The slice has one rare, disc
 
 ## Combat architecture
 
-Use a pure turn resolver over immutable battle snapshots: three owned creatures versus three data-defined laboratory opponents. Sort by speed each round (including slow), break ties with stable IDs and skip defeated units. Actions validate actor, target, learned ability, energy and cooldown before changing state. Basic attack remains available so combat cannot stall. `damage = max(1, round(raw / (1 + armor * armorFactor) * resistance * criticalMultiplier))`. Shield absorbs before HP. Burn/poison/regeneration tick at the affected unit's turn start; duration decrements after its action. Shock/weakness reduce outgoing damage. Cooldown N blocks the next N own turns. Energy recovers at turn start. Every player action and all ensuing AI turns are one persisted transaction. Defeat is temporary and never deletes creatures. Retreat grants no resources. A terminal battle produces a unique reward claim; application credits materials and the wing discovery once. A round limit prevents endless healing loops. No later-phase reactions, bosses or tower.
+Use a pure turn resolver over immutable battle snapshots: three owned creatures versus three data-defined laboratory opponents. Sort by speed each round (including slow), break ties with stable IDs and skip defeated units. Actions validate actor, target, learned ability, energy and cooldown before changing state. Basic attack remains available so combat cannot stall. `damage = max(1, round(raw / (1 + armor * armorFactor) * resistance * criticalMultiplier))`. Shield absorbs before HP. Burn/poison/regeneration tick at the affected unit's turn start; duration decrements after its action. Shock/weakness reduce outgoing damage. Cooldown N blocks the next N own turns. Energy recovers at turn start. Every player action and all ensuing AI turns are one persisted transaction. Defeat is temporary and never deletes creatures. Retreat grants no resources. A terminal battle produces a unique reward claim; application credits materials and the wing discovery once. A round limit prevents endless healing loops. Advanced challenges add reactions, bosses and tower scaling through an optional battle profile.
 
 ## Phase plan and acceptance
 
@@ -109,7 +109,7 @@ Use a pure turn resolver over immutable battle snapshots: three owned creatures 
 
 7. Research: observation-gated tree, progressive component scans, reusable biological blueprints, mutation analysis and paid guided creation; verify the entire tree from a fresh save and browser progression.
 
-Each phase gets its own commit after checks pass. Following the first-slice delivery, the user requested continued implementation. Breeding retains the plan's explicit enjoyable-creation-loop gate.
+Each phase gets its own commit after checks pass. Following the first-slice delivery, the user requested continued implementation. The user's further continuation authorizes breeding and subsequent phases.
 
 ## Exploration architecture
 
@@ -132,3 +132,8 @@ Save decoding verifies research prerequisites/objectives, scanner capabilities, 
 ## Breeding architecture
 
 Optional lineage retains parent identities/names, generation and each gene's source. Birth records preserve parent source snapshots. Anatomy samples each parental slot. Gene selection weights dominant/hybrid/recessive/unstable alleles 3/2/1/1; a configured blend chance and small bounded variation prevent clones. Eligible parental mutations have a configured inheritance chance. Decoder reconstruction verifies each birth against its snapshots and serial ordering. Cooldowns use the existing bounded foreground clock; reload never skips rest time. The user's request to continue supersedes the earlier gate deferral.
+
+
+## Advanced combat architecture
+
+An optional challenge profile preserves beginner battle semantics. Challenge stat reconstruction includes team tag bonuses, tower scaling, modifiers and boss phase state. Reactions consume a prerequisite status before applying damage amplification and a new status. Frozen actors skip one own turn while duration/cooldowns still advance. Boss phases trigger once at a configured health threshold. Tower floors advance only in the unique victory-claim transaction; boss victories and discoveries persist separately. Catalog validation covers every rule/reference; battle decoding reconstructs stats and validates advanced status bounds.

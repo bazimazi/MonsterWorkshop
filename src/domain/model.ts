@@ -79,7 +79,7 @@ export interface Component {
   mutationChance: number;
   visual: VisualDefinition;
   lore: string;
-  discovery: 'starter' | 'battle' | 'expedition' | 'research';
+  discovery: 'starter' | 'battle' | 'expedition' | 'research' | 'challenge';
 }
 export interface Trait {
   id: string;
@@ -88,7 +88,19 @@ export interface Trait {
   stats: StatModifiers;
   tags: string[];
 }
-export const STATUS_IDS = ['burn', 'poison', 'shock', 'slow', 'regeneration', 'weakness'] as const;
+export const STATUS_IDS = [
+  'burn',
+  'poison',
+  'shock',
+  'slow',
+  'regeneration',
+  'weakness',
+  'wet',
+  'conductive',
+  'frozen',
+  'armor-break',
+  'haste',
+] as const;
 export type StatusId = (typeof STATUS_IDS)[number];
 export type AbilityEffect =
   | { type: 'damage'; power: number; scaling: 'attack' | 'power'; element: Element }
@@ -234,6 +246,31 @@ export interface Catalog {
   resources: Resource[];
   regions: Region[];
   research: ResearchNode[];
+  advanced: {
+    reactions: {
+      id: string;
+      name: string;
+      element: Element;
+      requires: StatusId;
+      multiplier: number;
+      status: StatusId;
+      duration: number;
+      potency: number;
+    }[];
+    synergies: { id: string; name: string; tag: string; minimum: number; stats: StatModifiers }[];
+    bosses: {
+      id: string;
+      name: string;
+      components: string[];
+      seed: number;
+      scale: number;
+      phaseAt: number;
+      shield: number;
+      regeneration: number;
+      discovery: string;
+      biomass: number;
+    }[];
+  };
   rules: {
     generation: {
       version: number;

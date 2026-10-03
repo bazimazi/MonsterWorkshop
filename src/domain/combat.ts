@@ -1,8 +1,10 @@
 import type { ContentIndex } from './catalog.js';
 import type { Ability, Creature, CreatureSource, Stats, StatusId } from './model.js';
-import { STAT_KEYS, STATUS_IDS } from './model.js';
+import { STATUS_IDS } from './model.js';
 import { deriveCreature } from './generator.js';
 import { decodeCreature } from './serialization.js';
+import { challengeStats, decodeChallenge } from './challenges.js';
+import type { Challenge } from './challenges.js';
 import { clamp, Random } from './random.js';
 import {
   DomainError,
@@ -42,6 +44,7 @@ export interface Battle {
   status: 'active' | 'victory' | 'defeat';
   reason: 'eliminated' | 'limit' | 'retreat' | null;
   log: string[];
+  challenge?: Challenge;
 }
 export interface Action {
   actorId: string;
@@ -52,15 +55,14 @@ function log(battle: Battle, message: string): void {
   battle.log.push(message);
   if (battle.log.length > 80) battle.log.shift();
 }
-function actorStats(creature: Creature, team: 'player' | 'enemy', content: ContentIndex): Stats {
-  const stats = { ...creature.stats };
-  if (team === 'enemy')
-    for (const key of STAT_KEYS)
-      stats[key] = Math.max(1, Math.round(stats[key] * content.catalog.rules.combat.enemyScale));
-  return stats;
-}
-function unit(creature: Creature, team: 'player' | 'enemy', content: ContentIndex): Combatant {
-  const stats = actorStats(creature, team, content);
+function unit(
+  creature: Creature,
+  team: 'player' | 'enemy',
+  content: ContentIndex,
+  sources: Creature[],
+  challenge?: Challenge,
+): Combatant {
+  const stats = challengeStats(creature, team, sources, content, challenge);
   return {
     id: `${team}:${creature.id}`,
     team,
@@ -79,7 +81,11 @@ export function currentActor(battle: Battle): Combatant | undefined {
     : undefined;
 }
 function speed(u: Combatant): number {
-  return u.stats.speed * (1 - (u.statuses.find((s) => s.id === 'slow')?.potency ?? 0));
+  return (
+    u.stats.speed *
+    (1 - (u.statuses.find((s) => s.id === 'slow')?.potency ?? 0)) *
+    (1 + (u.statuses.find((s) => s.id === 'haste')?.potency ?? 0))
+  );
 }
 function turnOrder(battle: Battle): string[] {
   return battle.units
@@ -153,6 +159,16 @@ function prepareTurn(battle: Battle, content: ContentIndex): void {
       battle.turnIndex++;
       continue;
     }
+    if (actor.statuses.some((s) => s.id === 'frozen')) {
+      log(battle, `${actor.source.name} is frozen and misses a turn.`);
+      actor.statuses = actor.statuses
+        .map((s) => ({ ...s, duration: s.duration - 1 }))
+        .filter((s) => s.duration > 0);
+      for (const id of Object.keys(actor.cooldowns))
+        actor.cooldowns[id] = Math.max(0, actor.cooldowns[id]! - 1);
+      battle.turnIndex++;
+      continue;
+    }
     break;
   }
 }
@@ -163,6 +179,7 @@ export function createBattle(
   id: string,
   seed: number,
   startedAt: string,
+  challenge?: Challenge,
 ): Battle {
   if (players.length !== 3 || enemies.length !== 3)
     throw new DomainError('Choose exactly three creatures');
@@ -184,13 +201,14 @@ export function createBattle(
     turnIndex: 0,
     order: [],
     units: [
-      ...players.map((c) => unit(c, 'player', content)),
-      ...enemies.map((c) => unit(c, 'enemy', content)),
+      ...players.map((c) => unit(c, 'player', content, players, challenge)),
+      ...enemies.map((c) => unit(c, 'enemy', content, enemies, challenge)),
     ],
     rngState: seed,
     status: 'active',
     reason: null,
     log: ['The simulator awakens. Three inventions. One field test.'],
+    ...(challenge ? { challenge: decodeChallenge(challenge, content) } : {}),
   };
   battle.order = turnOrder(battle);
   prepareTurn(battle, content);
@@ -243,6 +261,22 @@ export function resolveAction(previous: Battle, action: Action, content: Content
   log(battle, `${actor.source.name} uses ${ability.name} on ${target.source.name}.`);
   for (const effect of ability.effects) {
     if (effect.type === 'damage') {
+      const reaction = battle.challenge
+        ? content.catalog.advanced.reactions.find(
+            (r) => r.element === effect.element && target.statuses.some((s) => s.id === r.requires),
+          )
+        : undefined;
+      if (reaction) {
+        target.statuses = target.statuses.filter(
+          (s) => s.id !== reaction.requires && s.id !== reaction.status,
+        );
+        target.statuses.push({
+          id: reaction.status,
+          duration: reaction.duration,
+          potency: reaction.potency,
+        });
+        log(battle, `${reaction.name}! ${target.source.name} gains ${reaction.status}.`);
+      }
       const critical = random.next() < rules.criticalChance;
       const element = deriveCreature(target.source, content).element;
       const resistance =
@@ -252,8 +286,11 @@ export function resolveAction(previous: Battle, action: Action, content: Content
         .filter((s) => s.id === 'shock' || s.id === 'weakness')
         .reduce((factor, s) => factor * (1 - clamp(s.potency, 0, 1)), 1);
       const damage = damageAmount(
-        actor.stats[effect.scaling] * effect.power * debuff,
-        target.stats.defense,
+        actor.stats[effect.scaling] * effect.power * debuff * (reaction?.multiplier ?? 1),
+        target.stats.defense *
+          (1 -
+            (target.statuses.find((s) => s.id === 'armor-break' || s.id === 'conductive')
+              ?.potency ?? 0)),
         rules.armorFactor,
         resistance,
         critical,
@@ -286,6 +323,34 @@ export function resolveAction(previous: Battle, action: Action, content: Content
           potency: effect.potency,
         });
       log(battle, `${target.source.name} gains ${effect.status} for ${effect.duration} turns.`);
+    }
+  }
+  const bossUnit = battle.units.find((u) => u.team === 'enemy' && u.source.id === 'opponent-1');
+  if (
+    battle.challenge?.kind === 'boss' &&
+    !battle.challenge.bossPhase &&
+    bossUnit &&
+    bossUnit.hp > 0
+  ) {
+    const boss = content.catalog.advanced.bosses.find((b) => b.id === battle.challenge!.bossId)!;
+    if (bossUnit.hp <= bossUnit.stats.hp * boss.phaseAt) {
+      battle.challenge.bossPhase = true;
+      bossUnit.stats = challengeStats(
+        bossUnit.source,
+        'enemy',
+        battle.units.filter((u) => u.team === 'enemy').map((u) => u.source),
+        content,
+        battle.challenge,
+      );
+      bossUnit.shield = Math.min(bossUnit.stats.hp, bossUnit.shield + boss.shield);
+      bossUnit.statuses = [
+        ...bossUnit.statuses.filter((s) => s.id !== 'regeneration'),
+        { id: 'regeneration', duration: 3, potency: boss.regeneration },
+      ];
+      log(
+        battle,
+        `${boss.name} enters its charged phase: shield, regeneration and amplified power!`,
+      );
     }
   }
   // Tick existing cooldowns only after an action. A cooldown of N blocks the next N own turns.
@@ -347,13 +412,21 @@ export function decodeBattle(value: unknown, content: ContentIndex): Battle {
   number(b.rngState, 'random state', 0, 0xffffffff, true);
   member(b.status, ['active', 'victory', 'defeat'], 'battle status');
   if (b.reason !== null) member(b.reason, ['eliminated', 'limit', 'retreat'], 'battle reason');
-  const units = list(b.units, 'combatants', 6).map((raw) => {
+  const challenge = b.challenge === undefined ? undefined : decodeChallenge(b.challenge, content);
+  const rawUnits = list(b.units, 'combatants', 6).map((u) => record(u, 'combatant'));
+  const units = rawUnits.map((raw) => {
     const u = record(raw, 'combatant');
     string(u.id, 'combatant id');
     const team = member(u.team, ['player', 'enemy'], 'team');
     const source = decodeCreature(u.source, content),
       creature = deriveCreature(source, content),
-      stats = actorStats(creature, team, content);
+      stats = challengeStats(
+        source,
+        team,
+        rawUnits.filter((u) => u.team === team).map((u) => decodeCreature(u.source, content)),
+        content,
+        challenge,
+      );
     if (u.id !== `${team}:${source.id}`)
       throw new DomainError('Combatant identity does not match its source');
     number(u.hp, 'health', 0, stats.hp, true);
@@ -368,7 +441,11 @@ export function decodeBattle(value: unknown, content: ContentIndex): Battle {
           s.potency,
           'potency',
           0,
-          ['shock', 'weakness', 'slow'].includes(s.id as string) ? 1 : 1000,
+          ['shock', 'weakness', 'slow', 'conductive', 'armor-break', 'haste'].includes(
+            s.id as string,
+          )
+            ? 1
+            : 1000,
         ),
       };
     });
@@ -442,5 +519,6 @@ export function decodeBattle(value: unknown, content: ContentIndex): Battle {
     status: b.status,
     reason: b.reason,
     log: messages,
+    ...(challenge ? { challenge } : {}),
   }) as Battle;
 }

@@ -12,6 +12,8 @@ import { escape, title } from './html.js';
 import { availableAbilities, canUse, currentActor } from '../domain/combat.js';
 import type { Battle, Combatant } from '../domain/combat.js';
 import { deriveCreature } from '../domain/generator.js';
+import { challengesView } from './challenges.js';
+import type { Challenge } from '../domain/challenges.js';
 import { breedingView } from './breeding.js';
 import { explorationView } from './exploration.js';
 import { describeCost, researchView } from './research.js';
@@ -61,6 +63,7 @@ export class GameUI {
   private explorerId: string | undefined;
   private lastTick = performance.now();
   private clockFailed = false;
+  private challengeModifier: Challenge['modifier'] = 'none';
   private parents: [string | undefined, string | undefined] = [undefined, undefined];
   private scannerId = 'dragon-head';
   private controlledMutation: string | undefined;
@@ -175,28 +178,30 @@ export class GameUI {
       this.controlledMutation = undefined;
     const screen = this.nav.current;
     const body =
-      screen === 'breeding'
-        ? breedingView(this.workshop, ...this.parents)
-        : screen === 'research'
-          ? researchView(
-              state,
-              this.workshop,
-              this.content,
-              state.discoveredComponents.includes(this.scannerId)
-                ? this.scannerId
-                : state.discoveredComponents[0]!,
-            )
-          : screen === 'explore'
-            ? explorationView(state, this.workshop, this.content, this.regionId, this.explorerId)
-            : screen === 'creatures'
-              ? this.creaturesView(state)
-              : screen === 'battle'
-                ? this.battleView(state)
-                : screen === 'journal'
-                  ? this.journalView(state)
-                  : screen === 'settings'
-                    ? this.settingsView(state)
-                    : this.workshopView(state);
+      screen === 'challenges'
+        ? challengesView(this.workshop, [...this.squad], this.challengeModifier)
+        : screen === 'breeding'
+          ? breedingView(this.workshop, ...this.parents)
+          : screen === 'research'
+            ? researchView(
+                state,
+                this.workshop,
+                this.content,
+                state.discoveredComponents.includes(this.scannerId)
+                  ? this.scannerId
+                  : state.discoveredComponents[0]!,
+              )
+            : screen === 'explore'
+              ? explorationView(state, this.workshop, this.content, this.regionId, this.explorerId)
+              : screen === 'creatures'
+                ? this.creaturesView(state)
+                : screen === 'battle'
+                  ? this.battleView(state)
+                  : screen === 'journal'
+                    ? this.journalView(state)
+                    : screen === 'settings'
+                      ? this.settingsView(state)
+                      : this.workshopView(state);
     const tabs: [Screen, string, string][] = [
       ['workshop', 'Workshop', '⚗'],
       ['creatures', 'Creatures', '◈'],
@@ -298,7 +303,7 @@ export class GameUI {
         const discovered = state.discoveredComponents.includes(p.id),
           selected = this.selected.has(p.id),
           quantity = state.inventory[p.id] ?? 0;
-        return `<button class="part ${selected ? 'selected' : ''} ${!discovered ? 'locked' : ''}" data-action="part" data-part="${p.id}" aria-pressed="${selected}" ${!discovered || (!selected && quantity === 0) ? 'disabled' : ''}><span class="part-icon" aria-hidden="true">${discovered ? { head: '♜', body: '◆', legs: '╳', organ: 'ϟ', armor: '⬡', wings: '⋈' }[p.slot] : '?'}</span><span class="part-copy"><strong>${discovered ? escape(p.name) : 'Unknown component'}</strong><small>${title(p.slot)} · ${discovered ? title(p.element) : p.discovery === 'battle' ? 'Win a battle to discover' : p.discovery === 'expedition' ? 'Explore a region to discover' : 'Research to discover'}</small></span><span class="quantity">${discovered ? '×' + quantity : 'LOCKED'}</span></button>`;
+        return `<button class="part ${selected ? 'selected' : ''} ${!discovered ? 'locked' : ''}" data-action="part" data-part="${p.id}" aria-pressed="${selected}" ${!discovered || (!selected && quantity === 0) ? 'disabled' : ''}><span class="part-icon" aria-hidden="true">${discovered ? { head: '♜', body: '◆', legs: '╳', organ: 'ϟ', armor: '⬡', wings: '⋈' }[p.slot] : '?'}</span><span class="part-copy"><strong>${discovered ? escape(p.name) : 'Unknown component'}</strong><small>${title(p.slot)} · ${discovered ? title(p.element) : p.discovery === 'battle' ? 'Win a battle to discover' : p.discovery === 'expedition' ? 'Explore a region to discover' : p.discovery === 'challenge' ? 'Win a challenge to discover' : 'Research to discover'}</small></span><span class="quantity">${discovered ? '×' + quantity : 'LOCKED'}</span></button>`;
       })
       .join(
         '',
@@ -351,7 +356,7 @@ export class GameUI {
   }
   private battleView(state: PlayerState): string {
     const heading =
-      '<div class="page-heading"><div><p class="eyebrow">BUILD IT. TEST IT. IMPROVE IT.</p><h1 tabindex="-1">Combat simulator</h1><p class="muted">Three inventions. A thousand possibilities.</p></div><span class="tag">3 VS 3 / FIELD TEST</span></div>';
+      '<div class="page-heading"><div><p class="eyebrow">BUILD IT. TEST IT. IMPROVE IT.</p><a class="secondary" href="#challenges">Challenge arena</a><h1 tabindex="-1">Combat simulator</h1><p class="muted">Three inventions. A thousand possibilities.</p></div><span class="tag">3 VS 3 / FIELD TEST</span></div>';
     if (this.reward) {
       const discovery = this.reward.newComponent
         ? this.content.component(this.reward.newComponent)
@@ -361,6 +366,11 @@ export class GameUI {
       )
         .map(
           ([id, n]) => `<span class="tag">+${n} ${escape(this.content.component(id).name)}</span>`,
+        )
+        .join('')}${Object.entries(this.reward.resources)
+        .map(
+          ([id, n]) =>
+            `<span class="tag mint">+${n} ${escape(this.content.resources.get(id)!.name)}</span>`,
         )
         .join(
           '',
@@ -589,6 +599,25 @@ export class GameUI {
       }
       this.render();
     }
+    if (action === 'start-tower' || action === 'start-boss') {
+      if (!this.squad.size)
+        this.squad = new Set(
+          this.workshop.creatures
+            .filter((c) => !this.workshop.isAssigned(c.id))
+            .slice(0, 3)
+            .map((c) => c.id),
+        );
+      this.workshop.startBattle(
+        [...this.squad],
+        new Date().toISOString(),
+        action === 'start-tower'
+          ? { kind: 'tower', modifier: this.challengeModifier }
+          : { kind: 'boss', bossId: button.dataset.id!, modifier: this.challengeModifier },
+      );
+      this.reward = undefined;
+      this.lastActor = undefined;
+      this.nav.go('battle');
+    }
     if (action === 'start-battle') {
       this.workshop.startBattle([...this.squad], new Date().toISOString());
       this.lastActor = undefined;
@@ -647,6 +676,8 @@ export class GameUI {
     }
   }
   private async change(input: HTMLInputElement): Promise<void> {
+    if (input.dataset.challengeModifier)
+      this.challengeModifier = input.value as Challenge['modifier'];
     if (input.dataset.parent !== undefined) {
       this.parents[Number(input.dataset.parent) as 0 | 1] = input.value || undefined;
       this.render();

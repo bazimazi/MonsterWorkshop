@@ -57,3 +57,9 @@ Validation: 57 unit tests and 22 desktop/mobile browser scenarios pass. A fresh-
 The user's continuation instruction authorizes proceeding past the earlier playtest gate. Implemented two-parent selection, seeded anatomy and gene inheritance, dominant/recessive weighting, bounded variation, eligible mutation inheritance, offspring creation, persistent foreground cooldowns and a family album. Parent snapshots and per-gene origin preserve lineage; save decoding recomputes offspring provenance and rejects cyclic families or forged genes. Breeding consumes biomass/fiber, retains parents and consumes no component stock. Older source records remain unchanged.
 
 Validation: 60 unit tests and 24 phone/desktop browser scenarios. Tests cover dominance distribution, deterministic inheritance, exact spending, unchanged parents/stock, cooldown resume, invalid lineage and failed-write rollback. Nursery screenshots were inspected. Phase 8 is separately committed; phases 9 through 12 follow.
+
+## Phase 9 - Advanced combat
+
+Implemented data-defined elemental reactions, wet/conductive/frozen/armor-break/haste statuses, tag-based team bonuses, Storm Hydra's health-triggered shield/regeneration/power phase, optional armored/volatile challenges, and a saved endless tower. Challenge rules affect advanced battles; beginner fights retain their existing behavior. Victory claims grant unique boss discoveries, resources and tower progression; retreat/defeat retain the floor. Challenge arena shows selected team synergy and all rules.
+
+Validation: 62 unit tests and 26 phone/desktop browser scenarios pass. Tests fight and resume the Hydra through its phase, collect Tidal Organ once, advance tower floors, verify reactions and synergy stats, reject corrupt challenges and retain floors after retreat. Browser tests select a modifier, resume and retreat a six-unit tower battle. Challenge screenshots were visually inspected.

@@ -31,11 +31,13 @@ import {
 } from '../domain/research.js';
 import type { ResearchProgress, Scan } from '../domain/research.js';
 import { breedCreature } from '../domain/breeding.js';
+import type { Challenge } from '../domain/challenges.js';
 export interface BattleReward {
   victory: boolean;
   biomass: number;
   quantities: Record<string, number>;
   newComponent: string | null;
+  resources: Record<string, number>;
 }
 export class Workshop {
   private value: PlayerState;
@@ -375,7 +377,11 @@ export class Workshop {
   restoreBackup(): void {
     this.value = this.saves.restoreBackup();
   }
-  startBattle(ids: string[], at: string): Battle {
+  startBattle(
+    ids: string[],
+    at: string,
+    options?: { kind: 'boss' | 'tower'; bossId?: string; modifier?: Challenge['modifier'] },
+  ): Battle {
     if (this.value.activeBattle) throw new DomainError('Finish the current field test first');
     const players = ids.map((id) => {
       const c = this.creatures.find((c) => c.id === id);
@@ -384,22 +390,43 @@ export class Workshop {
         throw new DomainError('An expedition creature cannot enter a field test');
       return c;
     });
+    const challenge: Challenge | undefined = options
+      ? {
+          kind: options.kind,
+          bossId:
+            options.kind === 'boss'
+              ? (options.bossId ?? this.content.catalog.advanced.bosses[0]!.id)
+              : null,
+          floor: options.kind === 'tower' ? this.value.towerFloor : 0,
+          modifier: options.modifier ?? 'none',
+          bossPhase: false,
+        }
+      : undefined;
+    const boss =
+      challenge?.kind === 'boss'
+        ? this.content.catalog.advanced.bosses.find((b) => b.id === challenge.bossId)
+        : undefined;
+    if (challenge?.kind === 'boss' && !boss) throw new DomainError('Unknown boss');
     const enemies = this.content.catalog.rules.combat.opponents.map((o, index) => {
-      const c = generateCreature(o.components, this.content, {
-        seed: o.seed,
-        createdAt: at,
-        creator: 'Simulator',
-        id: `opponent-${index + 1}`,
-        skipMutations: true,
-      });
-      c.name = o.name;
+      const c = generateCreature(
+        index === 0 && boss ? boss.components : o.components,
+        this.content,
+        {
+          seed: index === 0 && boss ? boss.seed : o.seed,
+          createdAt: at,
+          creator: 'Simulator',
+          id: `opponent-${index + 1}`,
+          skipMutations: true,
+        },
+      );
+      c.name = index === 0 && boss ? boss.name : o.name;
       return c;
     });
     const serial = this.value.nextBattleSerial,
       id = `battle-${this.value.seedBase}-${serial}`,
       seed = hash(id);
     const battle = runEnemyTurns(
-      createBattle(players, enemies, this.content, id, seed, at),
+      createBattle(players, enemies, this.content, id, seed, at, challenge),
       this.content,
     );
     this.transact((next) => {
@@ -434,13 +461,18 @@ export class Workshop {
       rules = this.content.catalog.rules.combat;
     if (!battle || battle.status === 'active' || this.value.claimedBattles.includes(battle.id))
       throw new DomainError('No unclaimed result');
+    const boss =
+      battle.challenge?.kind === 'boss'
+        ? this.content.catalog.advanced.bosses.find((b) => b.id === battle.challenge!.bossId)
+        : undefined;
+    const rewardComponent = boss?.discovery ?? (!battle.challenge ? rules.rewardComponent : null);
     const victory = battle.status === 'victory',
       newComponent =
-        victory && !this.value.discoveredComponents.includes(rules.rewardComponent)
-          ? rules.rewardComponent
+        victory && rewardComponent && !this.value.discoveredComponents.includes(rewardComponent)
+          ? rewardComponent
           : null;
     const quantities: Record<string, number> = {};
-    if (victory)
+    if (victory && !battle.challenge)
       for (const p of this.content.components.values())
         if (
           p.discovery === 'starter' ||
@@ -448,14 +480,27 @@ export class Workshop {
           p.id === rules.rewardComponent
         )
           quantities[p.id] = rules.rewardQuantity;
+    if (victory && boss) quantities[boss.discovery] = newComponent ? 2 : 1;
     const reward: BattleReward = {
       victory,
-      biomass: victory ? rules.victoryBiomass : rules.defeatBiomass,
+      biomass: victory
+        ? battle.challenge
+          ? (boss?.biomass ?? 30 + Math.min(100, battle.challenge.floor)) +
+            (battle.challenge.modifier === 'none' ? 0 : 10)
+          : rules.victoryBiomass
+        : rules.defeatBiomass,
       quantities,
       newComponent,
+      resources:
+        victory && battle.challenge ? (boss ? { 'storm-essence': 3 } : { crystal: 1 }) : {},
     };
     this.transact((next) => {
       next.biomass += reward.biomass;
+      for (const [id, n] of Object.entries(reward.resources))
+        next.resources[id] = (next.resources[id] ?? 0) + n;
+      if (victory && battle.challenge?.kind === 'tower') next.towerFloor++;
+      if (victory && boss && !next.bossVictories.includes(boss.id))
+        next.bossVictories.push(boss.id);
       for (const [id, quantity] of Object.entries(quantities))
         next.inventory[id] = (next.inventory[id] ?? 0) + quantity;
       if (newComponent) next.discoveredComponents.push(newComponent);

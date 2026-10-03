@@ -63,7 +63,11 @@ export function decodeCatalog(raw: unknown): Catalog {
           e.potency,
           'potency',
           0,
-          ['shock', 'weakness', 'slow'].includes(e.status as string) ? 1 : 1000,
+          ['shock', 'weakness', 'slow', 'conductive', 'armor-break', 'haste'].includes(
+            e.status as string,
+          )
+            ? 1
+            : 1000,
         );
       } else {
         number(e.power, 'effect power');
@@ -90,7 +94,7 @@ export function decodeCatalog(raw: unknown): Catalog {
     member(p.slot, SLOTS, 'slot');
     member(p.rarity, ['common', 'uncommon', 'rare', 'epic', 'legendary'], 'rarity');
     member(p.element, ELEMENTS, 'element');
-    member(p.discovery, ['starter', 'battle', 'expedition', 'research'], 'discovery');
+    member(p.discovery, ['starter', 'battle', 'expedition', 'research', 'challenge'], 'discovery');
     modifiers(p.stats, STAT_KEYS, 'component stats');
     modifiers(p.genes, GENES, 'component genes');
     references(p.abilities, abilityIds, 'ability');
@@ -304,6 +308,42 @@ export function decodeCatalog(raw: unknown): Catalog {
   number(breeding.cooldownMs, 'breeding cooldown', 1000, 3600000, true);
   number(breeding.variation, 'inheritance variation', 0, 10, true);
   for (const key of ['blendChance', 'mutationInheritance']) number(breeding[key], key, 0, 1);
+  const advanced = record(c.advanced, 'advanced combat');
+  for (const r of table(advanced.reactions, 'reactions')) {
+    string(r.name, 'reaction name');
+    member(r.element, ELEMENTS, 'reaction element');
+    member(r.requires, STATUS_IDS, 'reaction requirement');
+    member(r.status, STATUS_IDS, 'reaction status');
+    number(r.multiplier, 'reaction multiplier', 1, 3);
+    number(r.duration, 'reaction duration', 1, 10, true);
+    number(
+      r.potency,
+      'reaction potency',
+      0,
+      ['conductive', 'armor-break', 'haste', 'shock', 'slow', 'weakness'].includes(
+        r.status as string,
+      )
+        ? 1
+        : 1000,
+    );
+  }
+  for (const s of table(advanced.synergies, 'synergies')) {
+    string(s.name, 'synergy name');
+    string(s.tag, 'synergy tag');
+    number(s.minimum, 'synergy members', 2, 3, true);
+    modifiers(s.stats, STAT_KEYS, 'synergy stats');
+  }
+  for (const b of table(advanced.bosses, 'bosses')) {
+    string(b.name, 'boss name');
+    references(b.components, componentIds, 'boss components');
+    references([b.discovery], componentIds, 'boss discovery');
+    if (components.find((p) => p.id === b.discovery)?.discovery !== 'challenge')
+      throw new DomainError('Boss discovery must be challenge biology');
+    number(b.seed, 'boss seed', 0, 0xffffffff, true);
+    number(b.scale, 'boss scale', 0.5, 5);
+    number(b.phaseAt, 'boss threshold', 0.1, 0.9);
+    for (const key of ['shield', 'regeneration', 'biomass']) number(b[key], key, 1, 1000, true);
+  }
   return structuredClone(c) as unknown as Catalog;
 }
 function validateCost(raw: unknown, resourceIds: Set<string>): void {

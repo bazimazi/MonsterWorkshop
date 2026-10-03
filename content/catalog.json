@@ -438,6 +438,44 @@
       },
       "lore": "A cultured crystalline heart stores lightning inside a resonant lattice.",
       "discovery": "research"
+    },
+    {
+      "id": "tide-organ",
+      "name": "Tidal Organ",
+      "slot": "organ",
+      "category": "elemental",
+      "rarity": "uncommon",
+      "element": "water",
+      "stats": {
+        "power": 18,
+        "energy": 8
+      },
+      "genes": {
+        "element": 23,
+        "adaptation": 15
+      },
+      "abilities": ["tidal-surge"],
+      "traits": ["conductive"],
+      "tags": ["water", "swimmer", "elemental"],
+      "compatibleTags": ["plant", "electric"],
+      "conflictTags": [],
+      "energyCost": 5,
+      "weight": 1,
+      "size": 1,
+      "mutationChance": 0.06,
+      "visual": {
+        "mesh": "lightning",
+        "anchor": "organ",
+        "scale": 1,
+        "allowedScale": [0.8, 1.2],
+        "rotation": 0,
+        "allowedRotation": [-5, 5],
+        "layer": 6,
+        "color": "#78b7ea",
+        "inheritColor": 0.1
+      },
+      "lore": "The hydra carries a living reservoir. Its currents prime enemies for lightning.",
+      "discovery": "challenge"
     }
   ],
   "traits": [
@@ -646,6 +684,30 @@
           "duration": 2,
           "chance": 0.7,
           "potency": 0.2
+        }
+      ]
+    },
+    {
+      "id": "tidal-surge",
+      "name": "Tidal Surge",
+      "description": "Drench an enemy with water, preparing elemental reactions.",
+      "tags": ["water", "control"],
+      "cost": 5,
+      "cooldown": 1,
+      "target": "enemy",
+      "effects": [
+        {
+          "type": "damage",
+          "power": 1.1,
+          "scaling": "power",
+          "element": "water"
+        },
+        {
+          "type": "status",
+          "status": "wet",
+          "duration": 3,
+          "chance": 1,
+          "potency": 0
         }
       ]
     }
@@ -1101,5 +1163,90 @@
         "type": "mutation-control"
       }
     }
-  ]
+  ],
+  "advanced": {
+    "reactions": [
+      {
+        "id": "overload",
+        "name": "Electrical Overload",
+        "element": "lightning",
+        "requires": "shock",
+        "multiplier": 1.5,
+        "status": "conductive",
+        "duration": 2,
+        "potency": 0.25
+      },
+      {
+        "id": "water-conduction",
+        "name": "Water Conduction",
+        "element": "lightning",
+        "requires": "wet",
+        "multiplier": 1.6,
+        "status": "conductive",
+        "duration": 2,
+        "potency": 0.3
+      },
+      {
+        "id": "web-ignition",
+        "name": "Web Ignition",
+        "element": "fire",
+        "requires": "slow",
+        "multiplier": 1.4,
+        "status": "burn",
+        "duration": 2,
+        "potency": 6
+      },
+      {
+        "id": "freeze",
+        "name": "Flash Freeze",
+        "element": "ice",
+        "requires": "wet",
+        "multiplier": 1.2,
+        "status": "frozen",
+        "duration": 1,
+        "potency": 0
+      }
+    ],
+    "synergies": [
+      {
+        "id": "crystal-wall",
+        "name": "Crystal Wall",
+        "tag": "crystal",
+        "minimum": 2,
+        "stats": {
+          "defense": 4
+        }
+      },
+      {
+        "id": "storm-circuit",
+        "name": "Storm Circuit",
+        "tag": "electric",
+        "minimum": 2,
+        "stats": {
+          "energy": 5,
+          "power": 3
+        }
+      }
+    ],
+    "bosses": [
+      {
+        "id": "storm-hydra",
+        "name": "Storm Hydra",
+        "components": [
+          "dragon-head",
+          "crystal-body",
+          "lightning-organ",
+          "crystal-armor",
+          "storm-wings"
+        ],
+        "seed": 80,
+        "scale": 1.05,
+        "phaseAt": 0.5,
+        "shield": 30,
+        "regeneration": 6,
+        "discovery": "tide-organ",
+        "biomass": 65
+      }
+    ]
+  }
 }

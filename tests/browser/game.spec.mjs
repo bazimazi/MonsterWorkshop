@@ -1,5 +1,33 @@
 import { test, expect } from '@playwright/test';
 import { fullResearchWorkshop } from '../helpers/research-workshop.mjs';
+test('challenge arena starts a modifier tower battle and retreat preserves the floor', async ({
+  page,
+}) => {
+  const { w } = fullResearchWorkshop();
+  await page.goto('/#settings');
+  await page.getByLabel('Import save', { exact: true }).setInputFiles({
+    name: 'arena.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(w.exportSave()),
+  });
+  await expect(page.getByRole('status')).toContainText('imported');
+  await page.getByRole('link', { name: 'Battle', exact: true }).click();
+  await page.getByRole('link', { name: 'Challenge arena', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Challenge modifier' }).selectOption('armored');
+  await page.screenshot({
+    path: `artifacts/challenges-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+  await page.getByRole('button', { name: 'Enter tower floor 1' }).click();
+  await expect(page.locator('.fight-card')).toHaveCount(6);
+  await page.reload();
+  await page.getByRole('button', { name: 'Retreat safely' }).click();
+  await page.getByRole('button', { name: 'Return to habitat' }).click();
+  expect(
+    (await page.evaluate(() => JSON.parse(localStorage.getItem('monster-workshop.save')).data))
+      .towerFloor,
+  ).toBe(1);
+});
 test('breeding creates inherited offspring and reload preserves family and cooldown', async ({
   page,
 }) => {
@@ -8,13 +36,11 @@ test('breeding creates inherited offspring and reload preserves family and coold
   for (let i = 0; i < 20; i++) w.advanceExpeditions(1000);
   w.claimExpedition(job.id);
   await page.goto('/#settings');
-  await page
-    .getByLabel('Import save', { exact: true })
-    .setInputFiles({
-      name: 'family.json',
-      mimeType: 'application/json',
-      buffer: Buffer.from(w.exportSave()),
-    });
+  await page.getByLabel('Import save', { exact: true }).setInputFiles({
+    name: 'family.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(w.exportSave()),
+  });
   await expect(page.getByRole('status')).toContainText('imported');
   await page.getByRole('link', { name: 'Creatures', exact: true }).click();
   await page.getByRole('link', { name: 'Breeding nursery', exact: true }).click();
