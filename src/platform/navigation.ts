@@ -5,7 +5,8 @@ export type Screen =
   | 'explore'
   | 'research'
   | 'journal'
-  | 'settings';
+  | 'settings'
+  | 'breeding';
 const screens: Screen[] = [
   'workshop',
   'creatures',
@@ -14,6 +15,7 @@ const screens: Screen[] = [
   'research',
   'journal',
   'settings',
+  'breeding',
 ];
 export class Navigation {
   constructor(private render: (screen: Screen) => void) {

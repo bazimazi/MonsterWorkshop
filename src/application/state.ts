@@ -24,6 +24,8 @@ import { deriveCreature } from '../domain/generator.js';
 import { hash } from '../domain/random.js';
 import { decodeScan, hasResearch, researchRequirements, scannerLevel } from '../domain/research.js';
 import type { Scan, ResearchProgress } from '../domain/research.js';
+import { breedCreature } from '../domain/breeding.js';
+import type { Birth } from '../domain/breeding.js';
 export interface Options {
   sound: boolean;
   haptics: boolean;
@@ -61,6 +63,8 @@ export interface PlayerState {
   expeditionReports: ExpeditionReport[];
   completedResearch: string[];
   scans: Scan[];
+  births: Birth[];
+  breedingCooldowns: Record<string, number>;
 }
 export function initialState(content: ContentIndex, seed: number): PlayerState {
   const starter = content.catalog.components.filter((p) => p.discovery === 'starter');
@@ -87,6 +91,8 @@ export function initialState(content: ContentIndex, seed: number): PlayerState {
     expeditionReports: [],
     completedResearch: [],
     scans: [],
+    births: [],
+    breedingCooldowns: {},
   };
 }
 export function decodeOptions(value: unknown): Options {
@@ -361,6 +367,52 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
         !hasResearch(completedResearch, 'mutation-control', content)
       )
         throw new DomainError('Controlled experiment requires mutation research');
+      const breedingCooldowns = record(s.breedingCooldowns ?? {}, 'breeding cooldowns');
+      for (const [id, remaining] of Object.entries(breedingCooldowns)) {
+        if (!creatures.some((c) => c.id === id)) throw new DomainError('Unknown resting parent');
+        number(remaining, 'breeding cooldown', 0, content.catalog.rules.breeding.cooldownMs, true);
+      }
+      const births = list(s.births ?? [], 'births', creatures.length).map((value) => {
+        const birth = record(value, 'birth'),
+          childId = string(birth.childId, 'offspring');
+        const parents = list(birth.parents, 'parent snapshots', 2).map((p) =>
+          decodeCreature(p, content),
+        );
+        if (parents.length !== 2) throw new DomainError('Two parent snapshots required');
+        const child = creatures.find((c) => c.id === childId);
+        if (
+          !child?.lineage ||
+          parents.some((p) => !creatures.some((c) => c.id === p.id && c.signature === p.signature))
+        )
+          throw new DomainError('Invalid family ownership');
+        const childSerial = experiments.find((e) => e.creatureId === childId)!.serial;
+        if (
+          parents.some((p) => experiments.find((e) => e.creatureId === p.id)!.serial >= childSerial)
+        )
+          throw new DomainError('Cyclic lineage');
+        const expected = breedCreature(parents[0]!, parents[1]!, content, {
+          seed: child.seed,
+          id: child.id,
+          creator: child.creator,
+          createdAt: child.createdAt,
+        });
+        for (const key of [
+          'signature',
+          'genome',
+          'componentIds',
+          'mutationIds',
+          'lineage',
+        ] as const)
+          if (JSON.stringify(child[key]) !== JSON.stringify(expected[key]))
+            throw new DomainError('Offspring provenance is invalid');
+        return { childId, parents: parents as [CreatureSource, CreatureSource] };
+      });
+      unique(
+        births.map((b) => b.childId),
+        'births',
+      );
+      if (creatures.filter((c) => c.lineage).length !== births.length)
+        throw new DomainError('Missing birth record');
       return structuredClone({
         contentVersion: s.contentVersion,
         playerName: s.playerName,
@@ -382,6 +434,8 @@ export function stateCodec(content: ContentIndex): Codec<PlayerState> {
         expeditionReports,
         completedResearch,
         scans,
+        births,
+        breedingCooldowns,
       }) as PlayerState;
     },
   };

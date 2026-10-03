@@ -127,3 +127,8 @@ Research nodes declare costs, acyclic dependencies, objective counts and a typed
 Unlocking anatomy gives samples and a reusable cultivation recipe, creating a repeatable use for gathered resources. Mutation Atlas exposes rules only for previously observed mutations and upgrades recipe forecasts from qualitative estimates to numeric probability. Mutation control uses the existing generator's eligible force option after checking research, prior discovery, anatomy and extra costs. The source stores the resulting genome/mutations, while the experiment records the controlled mutation. Older experiment records default to natural creation. Existing generation rules and creature source formats remain unchanged.
 
 Save decoding verifies research prerequisites/objectives, scanner capabilities, discovered-sample ownership, blueprint discoveries and guided experiment authorization. All resource spending and knowledge changes cross the same save boundary; telemetry follows successful writes.
+
+
+## Breeding architecture
+
+Optional lineage retains parent identities/names, generation and each gene's source. Birth records preserve parent source snapshots. Anatomy samples each parental slot. Gene selection weights dominant/hybrid/recessive/unstable alleles 3/2/1/1; a configured blend chance and small bounded variation prevent clones. Eligible parental mutations have a configured inheritance chance. Decoder reconstruction verifies each birth against its snapshots and serial ordering. Cooldowns use the existing bounded foreground clock; reload never skips rest time. The user's request to continue supersedes the earlier gate deferral.

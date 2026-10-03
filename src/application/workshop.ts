@@ -30,6 +30,7 @@ import {
   scannerLevel,
 } from '../domain/research.js';
 import type { ResearchProgress, Scan } from '../domain/research.js';
+import { breedCreature } from '../domain/breeding.js';
 export interface BattleReward {
   victory: boolean;
   biomass: number;
@@ -173,13 +174,18 @@ export class Workshop {
     number(elapsedMs, 'active play interval', 0, 1000, true);
     if (
       !elapsedMs ||
-      !this.value.expeditions.some((e) => e.elapsedMs < this.content.region(e.regionId).durationMs)
+      (!this.value.expeditions.some(
+        (e) => e.elapsedMs < this.content.region(e.regionId).durationMs,
+      ) &&
+        !Object.values(this.value.breedingCooldowns).some((ms) => ms > 0))
     )
       return;
     this.transact((next) => {
       next.expeditions = next.expeditions.map((job) =>
         advanceExpedition(job, elapsedMs, this.content),
       );
+      for (const id of Object.keys(next.breedingCooldowns))
+        next.breedingCooldowns[id] = Math.max(0, next.breedingCooldowns[id]! - elapsedMs);
     });
   }
   claimExpedition(id: string): ExpeditionReward {
@@ -232,6 +238,53 @@ export class Workshop {
       this.content.catalog.rules.workshop.baseCost +
       validateAnatomy(ids, this.content).reduce((sum, p) => sum + p.energyCost, 0)
     );
+  }
+  breed(parentA: string, parentB: string, at: string): Creature {
+    date(at, 'birth time');
+    if (parentA === parentB) throw new DomainError('Choose two different parents');
+    const parents = [parentA, parentB].map((id) => {
+      const parent = this.value.creatures.find((c) => c.id === id);
+      if (!parent) throw new DomainError('Choose owned parents');
+      if (this.isAssigned(id) || (this.value.breedingCooldowns[id] ?? 0) > 0)
+        throw new DomainError('This parent is assigned or resting');
+      return parent;
+    });
+    if (this.value.creatures.length >= this.content.catalog.rules.workshop.maxCreatures)
+      throw new DomainError('Your habitat is full');
+    const serial = this.value.nextSerial,
+      seed = hash(`${this.value.seedBase}:birth:${serial}`);
+    const child = breedCreature(parents[0]!, parents[1]!, this.content, {
+      seed,
+      id: `creature-${serial}`,
+      createdAt: at,
+      creator: this.value.playerName,
+    });
+    this.transact((next) => {
+      this.spend(next, this.content.catalog.rules.breeding.cost);
+      next.nextSerial++;
+      const fresh = child.mutationIds.filter((id) => !next.discoveredMutations.includes(id));
+      child.history.discoveries = fresh.length;
+      next.discoveredMutations = [...new Set([...next.discoveredMutations, ...child.mutationIds])];
+      next.creatures.push(decodeCreature(child, this.content));
+      next.experiments.push({
+        serial,
+        creatureId: child.id,
+        seed,
+        componentIds: child.componentIds,
+        compatibility: child.compatibility.score,
+        mutationIds: child.mutationIds,
+        createdAt: at,
+        controlledMutation: null,
+      });
+      next.births.push({
+        childId: child.id,
+        parents: [structuredClone(parents[0]!), structuredClone(parents[1]!)],
+      });
+      for (const parent of parents)
+        next.breedingCooldowns[parent.id] = this.content.catalog.rules.breeding.cooldownMs;
+    });
+    this.analytics.track('offspring_born', { generation: child.lineage!.generation });
+    return child;
   }
   protected transact(change: (state: PlayerState) => void): void {
     const next = structuredClone(this.value);

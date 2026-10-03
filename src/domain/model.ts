@@ -140,6 +140,12 @@ export interface CreatureSource {
   createdAt: string;
   creator: string;
   history: History;
+  lineage?: {
+    parentIds: [string, string];
+    parentNames: [string, string];
+    generation: number;
+    inheritance: Record<GeneId, 'a' | 'b' | 'blend'>;
+  };
 }
 export interface Phenotype {
   bodyScale: number;
@@ -286,5 +292,12 @@ export interface Catalog {
       experience: number;
     };
     research: { basicScanCost: Cost; advancedScanCost: Cost; controlledMutationCost: Cost };
+    breeding: {
+      cost: Cost;
+      cooldownMs: number;
+      variation: number;
+      blendChance: number;
+      mutationInheritance: number;
+    };
   };
 }

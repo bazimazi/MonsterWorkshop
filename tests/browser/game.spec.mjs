@@ -1,5 +1,41 @@
 import { test, expect } from '@playwright/test';
 import { fullResearchWorkshop } from '../helpers/research-workshop.mjs';
+test('breeding creates inherited offspring and reload preserves family and cooldown', async ({
+  page,
+}) => {
+  const { w } = fullResearchWorkshop();
+  const job = w.startExpedition('green-meadow', 'creature-1', '2026-10-03T00:00:00Z');
+  for (let i = 0; i < 20; i++) w.advanceExpeditions(1000);
+  w.claimExpedition(job.id);
+  await page.goto('/#settings');
+  await page
+    .getByLabel('Import save', { exact: true })
+    .setInputFiles({
+      name: 'family.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(w.exportSave()),
+    });
+  await expect(page.getByRole('status')).toContainText('imported');
+  await page.getByRole('link', { name: 'Creatures', exact: true }).click();
+  await page.getByRole('link', { name: 'Breeding nursery', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Parent A' }).selectOption('creature-1');
+  await page.getByRole('combobox', { name: 'Parent B' }).selectOption('creature-2');
+  await page.getByRole('button', { name: 'Create offspring' }).click();
+  await page.getByRole('button', { name: 'Keep experimenting' }).click();
+  await expect(page.getByRole('button', { name: 'Create offspring' })).toBeDisabled();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Family album' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: `artifacts/breeding-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+  const state = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('monster-workshop.save')).data,
+  );
+  expect(state.births).toHaveLength(1);
+  expect(state.creatures.at(-1).lineage.generation).toBe(2);
+});
 test('research spends gathered materials, progressively reveals samples and unlocks new anatomy', async ({
   page,
 }) => {

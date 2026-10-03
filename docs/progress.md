@@ -52,4 +52,8 @@ Botanical and Crystalline Anatomy unlock Verdant Dragon Head and Prism Organ sam
 
 Validation: 57 unit tests and 22 desktop/mobile browser scenarios pass. A fresh-save domain progression completes all six nodes through actual manufacture, battle, gathering and scanning actions, then creates a guided mutant and cultivates additional samples. Tests cover exact spending, unmet objectives, duplicate research/scans, hidden-data projections, migration, forged capabilities, source preservation, and failed-write rollback. Browser scenarios verify basic-to-advanced scans, reload, new head manufacturing, and guided mutation via a gameplay-derived imported save. Research, scanner and new creature screenshots were visually inspected on phone and desktop.
 
-Phases 0 through 7 are complete and separately committed. Phase 8 is next; section 106 explicitly requires an enjoyable creation-loop playtest before breeding. Human playtest feedback remains outstanding. Phases 8 through 12 have not been implemented.
+## Phase 8 - Breeding
+
+The user's continuation instruction authorizes proceeding past the earlier playtest gate. Implemented two-parent selection, seeded anatomy and gene inheritance, dominant/recessive weighting, bounded variation, eligible mutation inheritance, offspring creation, persistent foreground cooldowns and a family album. Parent snapshots and per-gene origin preserve lineage; save decoding recomputes offspring provenance and rejects cyclic families or forged genes. Breeding consumes biomass/fiber, retains parents and consumes no component stock. Older source records remain unchanged.
+
+Validation: 60 unit tests and 24 phone/desktop browser scenarios. Tests cover dominance distribution, deterministic inheritance, exact spending, unchanged parents/stock, cooldown resume, invalid lineage and failed-write rollback. Nursery screenshots were inspected. Phase 8 is separately committed; phases 9 through 12 follow.

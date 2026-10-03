@@ -12,6 +12,7 @@ import { escape, title } from './html.js';
 import { availableAbilities, canUse, currentActor } from '../domain/combat.js';
 import type { Battle, Combatant } from '../domain/combat.js';
 import { deriveCreature } from '../domain/generator.js';
+import { breedingView } from './breeding.js';
 import { explorationView } from './exploration.js';
 import { describeCost, researchView } from './research.js';
 import { costRequirements, hasResearch, mutationConditions } from '../domain/research.js';
@@ -60,6 +61,7 @@ export class GameUI {
   private explorerId: string | undefined;
   private lastTick = performance.now();
   private clockFailed = false;
+  private parents: [string | undefined, string | undefined] = [undefined, undefined];
   private scannerId = 'dragon-head';
   private controlledMutation: string | undefined;
   constructor(
@@ -109,7 +111,26 @@ export class GameUI {
     if (document.hidden || this.clockFailed) return;
     try {
       this.workshop.advanceExpeditions(elapsed);
-      for (const job of this.workshop.state.expeditions) {
+      const current = this.workshop.state;
+      for (const node of this.root.querySelectorAll<HTMLElement>('[data-resting]'))
+        node.textContent = `${Math.ceil((current.breedingCooldowns[node.dataset.resting!] ?? 0) / 1000)}s resting`;
+      const breedButton = this.root.querySelector<HTMLButtonElement>('[data-action="breed"]');
+      if (
+        breedButton &&
+        this.parents.every(
+          (id) => id && !this.workshop.isAssigned(id) && !(current.breedingCooldowns[id] ?? 0),
+        )
+      ) {
+        const rules = this.content.catalog.rules.breeding;
+        breedButton.disabled =
+          this.parents[0] === this.parents[1] ||
+          current.biomass < rules.cost.biomass ||
+          Object.entries(rules.cost.resources).some(
+            ([id, n]) => (current.resources[id] ?? 0) < n,
+          ) ||
+          current.creatures.length >= this.content.catalog.rules.workshop.maxCreatures;
+      }
+      for (const job of current.expeditions) {
         const card = this.root.querySelector<HTMLElement>(`[data-job="${job.id}"]`);
         if (!card) continue;
         const duration = this.content.region(job.regionId).durationMs,
@@ -154,26 +175,28 @@ export class GameUI {
       this.controlledMutation = undefined;
     const screen = this.nav.current;
     const body =
-      screen === 'research'
-        ? researchView(
-            state,
-            this.workshop,
-            this.content,
-            state.discoveredComponents.includes(this.scannerId)
-              ? this.scannerId
-              : state.discoveredComponents[0]!,
-          )
-        : screen === 'explore'
-          ? explorationView(state, this.workshop, this.content, this.regionId, this.explorerId)
-          : screen === 'creatures'
-            ? this.creaturesView(state)
-            : screen === 'battle'
-              ? this.battleView(state)
-              : screen === 'journal'
-                ? this.journalView(state)
-                : screen === 'settings'
-                  ? this.settingsView(state)
-                  : this.workshopView(state);
+      screen === 'breeding'
+        ? breedingView(this.workshop, ...this.parents)
+        : screen === 'research'
+          ? researchView(
+              state,
+              this.workshop,
+              this.content,
+              state.discoveredComponents.includes(this.scannerId)
+                ? this.scannerId
+                : state.discoveredComponents[0]!,
+            )
+          : screen === 'explore'
+            ? explorationView(state, this.workshop, this.content, this.regionId, this.explorerId)
+            : screen === 'creatures'
+              ? this.creaturesView(state)
+              : screen === 'battle'
+                ? this.battleView(state)
+                : screen === 'journal'
+                  ? this.journalView(state)
+                  : screen === 'settings'
+                    ? this.settingsView(state)
+                    : this.workshopView(state);
     const tabs: [Screen, string, string][] = [
       ['workshop', 'Workshop', '⚗'],
       ['creatures', 'Creatures', '◈'],
@@ -181,7 +204,7 @@ export class GameUI {
       ['research', 'Research', '⌕'],
       ['explore', 'Explore', '❧'],
     ];
-    this.root.innerHTML = `<header class="topbar"><a class="brand" href="#workshop"><img src="./icon.svg" alt="" width="36" height="36"><span>MONSTER<span class="brand-light">WORKSHOP</span></span></a><div class="resource"><span class="resource-dot" aria-hidden="true"></span><strong>${state.biomass}</strong><span>biomass</span></div><div class="utility-links"><a class="utility-link" href="#journal" aria-label="Journal">&#8801;</a><a class="utility-link" href="#settings" aria-label="Settings">&#9881;</a></div></header><nav class="navigation" aria-label="Main navigation">${tabs.map(([key, label, symbol]) => `<a href="#${key}" ${screen === key ? 'aria-current="page"' : ''}><span aria-hidden="true">${symbol}</span>${label}${key === 'creatures' ? `<small>${state.creatures.length}</small>` : ''}</a>`).join('')}</nav><main class="shell game-shell">${this.notice ? `<div class="notice ${this.isError ? 'error' : ''}" role="${this.isError ? 'alert' : 'status'}">${escape(this.notice)}<button class="quiet" data-action="dismiss" aria-label="Dismiss message">×</button></div>` : ''}${body}</main><footer class="footer">A little science. A little strange. <span>Saved on this device</span></footer>${this.modal()}`;
+    this.root.innerHTML = `<header class="topbar"><a class="brand" href="#workshop"><img src="./icon.svg" alt="" width="36" height="36"><span>MONSTER<span class="brand-light">WORKSHOP</span></span></a><div class="resource"><span class="resource-dot" aria-hidden="true"></span><strong>${state.biomass}</strong><span>biomass</span></div><div class="utility-links"><a class="utility-link" href="#journal" aria-label="Journal">&#8801;</a><a class="utility-link" href="#settings" aria-label="Settings">&#9881;</a></div></header><nav class="navigation" aria-label="Main navigation">${tabs.map(([key, label, symbol]) => `<a href="#${key}" ${screen === key ? 'aria-current="page"' : ''}><span aria-hidden="true">${symbol}</span>${label}${key === 'creatures' ? `<small aria-hidden="true">${state.creatures.length}</small>` : ''}</a>`).join('')}</nav><main class="shell game-shell">${this.notice ? `<div class="notice ${this.isError ? 'error' : ''}" role="${this.isError ? 'alert' : 'status'}">${escape(this.notice)}<button class="quiet" data-action="dismiss" aria-label="Dismiss message">×</button></div>` : ''}${body}</main><footer class="footer">A little science. A little strange. <span>Saved on this device</span></footer>${this.modal()}`;
     const dialog = this.root.querySelector<HTMLDialogElement>('dialog');
     if (dialog) {
       dialog.showModal();
@@ -285,7 +308,7 @@ export class GameUI {
     const all = this.workshop.creatures,
       creatures = all.filter((c) => this.filter !== 'mutated' || c.mutationIds.length > 0);
     const selected = all.find((c) => c.id === this.inspectedId);
-    return `<div class="page-heading"><div><p class="eyebrow">YOUR LIVING INVENTIONS</p><h1 tabindex="-1">The habitat</h1><p class="muted">${state.creatures.length} / ${this.content.catalog.rules.workshop.maxCreatures} specimens · Made by you.</p></div><label class="filter-label">Show <select data-filter="true" aria-label="Filter creatures"><option value="all" ${this.filter === 'all' ? 'selected' : ''}>All creatures</option><option value="mutated" ${this.filter === 'mutated' ? 'selected' : ''}>Mutated creatures</option></select></label></div>${!all.length ? '<section class="panel empty"><h2>Your first invention belongs here.</h2><p class="muted">Build something curious in the creation chamber.</p><a class="primary" href="#workshop">Start an experiment</a></section>' : `<div class="creature-grid">${creatures.map((c) => `<button class="panel creature-card" data-action="inspect" data-id="${escape(c.id)}">${renderCreature(c, this.content, false)}<strong>${escape(c.name)}</strong><span class="card-meta">${title(c.element)} · ${title(c.quality)} · Lv ${c.level}</span><span class="tag ${c.mutationIds.length ? 'gold' : ''}">${c.mutationIds.length ? '✦ MUTATED' : c.roles.map(title).join(' / ')}</span></button>`).join('')}</div>${!creatures.length ? '<p class="muted">No mutations discovered yet. Try an electric component.</p>' : ''}`}${
+    return `<div class="page-heading"><div><p class="eyebrow">YOUR LIVING INVENTIONS</p><a class="secondary" href="#breeding">Breeding nursery</a><h1 tabindex="-1">The habitat</h1><p class="muted">${state.creatures.length} / ${this.content.catalog.rules.workshop.maxCreatures} specimens · Made by you.</p></div><label class="filter-label">Show <select data-filter="true" aria-label="Filter creatures"><option value="all" ${this.filter === 'all' ? 'selected' : ''}>All creatures</option><option value="mutated" ${this.filter === 'mutated' ? 'selected' : ''}>Mutated creatures</option></select></label></div>${!all.length ? '<section class="panel empty"><h2>Your first invention belongs here.</h2><p class="muted">Build something curious in the creation chamber.</p><a class="primary" href="#workshop">Start an experiment</a></section>' : `<div class="creature-grid">${creatures.map((c) => `<button class="panel creature-card" data-action="inspect" data-id="${escape(c.id)}">${renderCreature(c, this.content, false)}<strong>${escape(c.name)}</strong><span class="card-meta">${title(c.element)} · ${title(c.quality)} · Lv ${c.level}</span><span class="tag ${c.mutationIds.length ? 'gold' : ''}">${c.mutationIds.length ? '✦ MUTATED' : c.roles.map(title).join(' / ')}</span></button>`).join('')}</div>${!creatures.length ? '<p class="muted">No mutations discovered yet. Try an electric component.</p>' : ''}`}${
       selected
         ? `<section class="panel specimen-detail" id="specimen-detail"><div class="section-title"><h2>${escape(selected.name)}</h2><span class="tag">SPECIMEN ${escape(selected.id)}</span></div>${this.stats(selected)}<form data-rename="${escape(selected.id)}" class="rename-form"><label>Name your creation<input name="name" maxlength="40" required value="${escape(selected.name)}"></label><button class="secondary" type="submit">Save name</button></form><div class="detail-grid"><div><h3>Genome</h3>${GENES.map((id) => `<div class="gene-row"><span>${title(id)}</span><meter min="0" max="100" value="${selected.genome[id].value}" aria-label="${id}"></meter><strong>${selected.genome[id].value}</strong></div>`).join('')}</div><div><h3>Abilities</h3>${selected.abilityIds
             .map((id) => {
@@ -489,6 +512,17 @@ export class GameUI {
         .querySelector('#specimen-detail')
         ?.scrollIntoView({ behavior: this.animated() ? 'smooth' : 'instant', block: 'start' });
     }
+    if (action === 'breed') {
+      const child = this.workshop.breed(
+        this.parents[0]!,
+        this.parents[1]!,
+        new Date().toISOString(),
+      );
+      this.inspectedId = child.id;
+      this.revealId = child.id;
+      this.notice = 'An offspring has joined your family.';
+      this.render();
+    }
     if (action === 'research') {
       this.workshop.completeResearch(button.dataset.id!);
       this.notice = `${this.content.research.get(button.dataset.id!)!.name} researched.`;
@@ -613,6 +647,10 @@ export class GameUI {
     }
   }
   private async change(input: HTMLInputElement): Promise<void> {
+    if (input.dataset.parent !== undefined) {
+      this.parents[Number(input.dataset.parent) as 0 | 1] = input.value || undefined;
+      this.render();
+    }
     if (input.dataset.scannerComponent) {
       this.scannerId = input.value;
       this.render();

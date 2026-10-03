@@ -62,6 +62,20 @@ export function decodeCreature(value: unknown, content: ContentIndex): CreatureS
   if ((history.victories as number) > (history.battles as number))
     throw new DomainError('Victories exceed battles');
   if (history.firstBattleAt !== null) date(history.firstBattleAt, 'first battle');
+  if (c.lineage !== undefined) {
+    const lineage = record(c.lineage, 'lineage');
+    const parents = strings(lineage.parentIds, 'parents', 2);
+    if (parents.length !== 2 || parents.includes(c.id as string))
+      throw new DomainError('Invalid parents');
+    unique(parents, 'parents');
+    if (strings(lineage.parentNames, 'parent names', 2).length !== 2)
+      throw new DomainError('Two parent names required');
+    number(lineage.generation, 'lineage generation', 2, 1000000, true);
+    const inheritance = record(lineage.inheritance, 'inheritance');
+    if (Object.keys(inheritance).length !== GENES.length)
+      throw new DomainError('Incomplete inheritance');
+    for (const gene of GENES) member(inheritance[gene], ['a', 'b', 'blend'], 'inherited gene');
+  }
   // Pick source fields explicitly; derived stats injected into an import are discarded.
   return structuredClone({
     id: c.id,
@@ -79,6 +93,9 @@ export function decodeCreature(value: unknown, content: ContentIndex): CreatureS
     createdAt: c.createdAt,
     creator: c.creator,
     history: c.history,
+    ...(c.lineage === undefined
+      ? {}
+      : { lineage: c.lineage as NonNullable<CreatureSource['lineage']> }),
   }) as CreatureSource;
 }
 export function serializeCreature(creature: CreatureSource, content: ContentIndex): string {

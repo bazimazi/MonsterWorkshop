@@ -299,6 +299,11 @@ export function decodeCatalog(raw: unknown): Catalog {
   const researchRules = record(rules.research, 'research rules');
   for (const key of ['basicScanCost', 'advancedScanCost', 'controlledMutationCost'])
     validateCost(researchRules[key], resourceIds);
+  const breeding = record(rules.breeding, 'breeding rules');
+  validateCost(breeding.cost, resourceIds);
+  number(breeding.cooldownMs, 'breeding cooldown', 1000, 3600000, true);
+  number(breeding.variation, 'inheritance variation', 0, 10, true);
+  for (const key of ['blendChance', 'mutationInheritance']) number(breeding[key], key, 0, 1);
   return structuredClone(c) as unknown as Catalog;
 }
 function validateCost(raw: unknown, resourceIds: Set<string>): void {
