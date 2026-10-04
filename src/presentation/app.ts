@@ -80,6 +80,7 @@ export class GameUI {
   private clockFailed = false;
   private saveChanged = false;
   private sessionEnded = false;
+  private pendingImport: { revision: number; kind: 'save' | 'shared' } | undefined;
   private calendarKey: string | null = null;
   private renderedScreen: Screen | undefined;
   private dialogReturnFocus: FocusBookmark | undefined;
@@ -162,6 +163,7 @@ export class GameUI {
       'pagehide',
       () => {
         this.sessionEnded = true;
+        this.cancelImport();
         clearInterval(interval);
         if (this.timer) clearTimeout(this.timer);
       },
@@ -170,6 +172,7 @@ export class GameUI {
     window.addEventListener('storage', (event) => {
       if (event.storageArea === localStorage && (event.key === SAVE_KEY || event.key === null)) {
         this.saveChanged = true;
+        this.cancelImport();
         if (this.timer) clearTimeout(this.timer);
         this.render();
       }
@@ -180,7 +183,7 @@ export class GameUI {
     const now = performance.now(),
       elapsed = Math.max(0, Math.min(1000, Math.floor(now - this.lastTick)));
     this.lastTick = now;
-    if (document.hidden || this.saveChanged || this.sessionEnded) return;
+    if (document.hidden || this.saveChanged || this.sessionEnded || this.pendingImport) return;
     this.refreshCalendar();
     if (this.clockFailed) return;
     try {
@@ -241,6 +244,7 @@ export class GameUI {
       this.render();
   }
   private resetSession(): void {
+    this.cancelImport();
     if (this.timer) clearTimeout(this.timer);
     const state = this.workshop.state;
     this.selected = new Set(
@@ -295,6 +299,7 @@ export class GameUI {
     logger.error(error);
     if (error instanceof SaveConflictError) {
       this.saveChanged = true;
+      this.cancelImport();
       if (this.timer) clearTimeout(this.timer);
     }
     this.notify(error instanceof Error ? error.message : 'Something went wrong', true);
@@ -306,11 +311,53 @@ export class GameUI {
     this.feedback.enabled = state.options.sound;
     this.feedback.haptics = state.options.haptics;
   }
+  private cancelImport(): void {
+    this.pendingImport = undefined;
+    this.lastTick = performance.now();
+  }
+  private async importFile(file: File, kind: 'save' | 'shared'): Promise<void> {
+    const pending = { revision: this.workshop.saveRevision, kind };
+    this.pendingImport = pending;
+    this.lastTick = performance.now();
+    try {
+      if (kind === 'save' && file.size > MAX_SAVE_BYTES) throw new SaveError(SAVE_SIZE_ERROR);
+      if (kind === 'shared' && file.size > MAX_SHARE_BYTES)
+        throw new Error('Shared file is too large');
+      this.notify('');
+      this.render();
+      const raw = await file.text();
+      if (this.pendingImport !== pending || this.saveChanged || this.sessionEnded) return;
+      if (this.workshop.saveRevision !== pending.revision)
+        throw new Error('Your workshop changed while reading the file. Select it again to import.');
+      if (kind === 'shared') {
+        this.workshop.importShare(raw);
+        this.notify('Shared design imported.');
+      } else {
+        this.workshop.importSave(raw);
+        this.resetSession();
+        this.notify('Workshop imported.');
+      }
+    } catch (error) {
+      // A superseded, cancelled or departed read must not change data or announcements.
+      if (this.pendingImport !== pending || this.saveChanged || this.sessionEnded) return;
+      throw error;
+    } finally {
+      if (this.pendingImport === pending) this.cancelImport();
+    }
+    this.render();
+  }
   private render(focusPart?: string): void {
     if (this.sessionEnded) return;
     if (this.saveChanged) {
       showSaveChanged(this.root);
       return;
+    }
+    if (this.pendingImport && this.pendingImport.revision !== this.workshop.saveRevision) {
+      this.cancelImport();
+      this.notify(
+        'Pending file import cancelled because your workshop changed. Select the file again to import.',
+        true,
+      );
     }
     const focus = captureFocus(this.root),
       previousDialog = this.root.querySelector('dialog'),
@@ -378,7 +425,7 @@ export class GameUI {
       ['research', 'Research', '⌕'],
       ['explore', 'Explore', '❧'],
     ];
-    this.root.innerHTML = `<a class="skip-link" href="#main-content" data-action="skip-content">Skip to content</a><header class="topbar"><a class="brand" href="#workshop"><img src="./icon.svg" alt="" width="36" height="36"><span>MONSTER<span class="brand-light">WORKSHOP</span></span></a><div class="resource"><span class="resource-dot" aria-hidden="true"></span><strong>${state.biomass}</strong><span>biomass</span></div><div class="utility-links"><a class="utility-link" href="#market" aria-label="Marketplace">&#9878;</a><a class="utility-link" href="#journal" aria-label="Journal">&#8801;</a><a class="utility-link" href="#settings" aria-label="Settings">&#9881;</a></div></header><nav class="navigation" aria-label="Main navigation">${tabs.map(([key, label, symbol]) => `<a href="#${key}" ${screen === key ? 'aria-current="page"' : ''}><span aria-hidden="true">${symbol}</span>${label}${key === 'creatures' ? `<small aria-hidden="true">${this.workshop.creatures.length}</small>` : ''}</a>`).join('')}</nav><main class="shell game-shell" id="main-content">${this.notice ? `<div class="notice ${this.isError ? 'error' : ''}" role="${this.isError ? 'alert' : 'status'}">${escape(this.notice)}<button class="quiet" data-action="dismiss" aria-label="Dismiss message">×</button></div>` : ''}${this.clockFailed ? '<section class="notice clock-recovery" role="status"><p>Expeditions and parent recovery are paused until this browser can save.</p><button class="secondary" data-action="retry-clock">Resume active timers</button></section>' : ''}${body}</main><footer class="footer">A little science. A little strange. <span>Saved on this device</span></footer>${this.modal()}`;
+    this.root.innerHTML = `<a class="skip-link" href="#main-content" data-action="skip-content">Skip to content</a><header class="topbar"><a class="brand" href="#workshop"><img src="./icon.svg" alt="" width="36" height="36"><span>MONSTER<span class="brand-light">WORKSHOP</span></span></a><div class="resource"><span class="resource-dot" aria-hidden="true"></span><strong>${state.biomass}</strong><span>biomass</span></div><div class="utility-links"><a class="utility-link" href="#market" aria-label="Marketplace">&#9878;</a><a class="utility-link" href="#journal" aria-label="Journal">&#8801;</a><a class="utility-link" href="#settings" aria-label="Settings">&#9881;</a></div></header><nav class="navigation" aria-label="Main navigation">${tabs.map(([key, label, symbol]) => `<a href="#${key}" ${screen === key ? 'aria-current="page"' : ''}><span aria-hidden="true">${symbol}</span>${label}${key === 'creatures' ? `<small aria-hidden="true">${this.workshop.creatures.length}</small>` : ''}</a>`).join('')}</nav><main class="shell game-shell" id="main-content">${this.notice ? `<div class="notice ${this.isError ? 'error' : ''}" role="${this.isError ? 'alert' : 'status'}">${escape(this.notice)}<button class="quiet" data-action="dismiss" aria-label="Dismiss message">×</button></div>` : ''}${this.pendingImport ? `<section class="notice clock-recovery" role="status"><p>Reading ${this.pendingImport.kind === 'save' ? 'save file' : 'shared design'}. Active timers are paused.</p><button class="secondary" data-action="cancel-import">Cancel import</button></section>` : ''}${this.clockFailed ? '<section class="notice clock-recovery" role="status"><p>Expeditions and parent recovery are paused until this browser can save.</p><button class="secondary" data-action="retry-clock">Resume active timers</button></section>' : ''}${body}</main><footer class="footer">A little science. A little strange. <span>Saved on this device</span></footer>${this.modal()}`;
     const dialog = this.root.querySelector<HTMLDialogElement>('dialog');
     if (sameScreen)
       for (const details of this.root.querySelectorAll<HTMLDetailsElement>(
@@ -663,6 +710,11 @@ export class GameUI {
       return;
     }
     if (this.saveChanged || this.sessionEnded) return;
+    if (action === 'cancel-import') {
+      this.cancelImport();
+      this.notify('Import cancelled.');
+      this.render();
+    }
     if (action === 'skip-content') {
       const heading = this.root.querySelector<HTMLElement>('main h1');
       heading?.focus();
@@ -959,14 +1011,7 @@ export class GameUI {
     }
     if (input.dataset.shareImport) {
       const file = input.files?.[0];
-      if (file) {
-        if (file.size > MAX_SHARE_BYTES) throw new Error('Shared file is too large');
-        const raw = await file.text();
-        if (this.saveChanged || this.sessionEnded) return;
-        this.workshop.importShare(raw);
-        this.notify('Shared design imported.');
-        this.render();
-      }
+      if (file) await this.importFile(file, 'shared');
     }
     if (input.dataset.marketOffer) {
       this.marketOffer = input.value;
@@ -1014,14 +1059,7 @@ export class GameUI {
     }
     if (input.dataset.import) {
       const file = input.files?.[0];
-      if (!file) return;
-      if (file.size > MAX_SAVE_BYTES) throw new SaveError(SAVE_SIZE_ERROR);
-      const raw = await file.text();
-      if (this.saveChanged || this.sessionEnded) return;
-      this.workshop.importSave(raw);
-      this.resetSession();
-      this.notify('Workshop imported.');
-      this.render();
+      if (file) await this.importFile(file, 'save');
     }
   }
 }

@@ -52,6 +52,7 @@ export interface BattleReward {
 }
 export class Workshop {
   private value: PlayerState;
+  private revision = 0;
   constructor(
     readonly content: ContentIndex,
     private saves: SaveRepository<PlayerState>,
@@ -64,6 +65,10 @@ export class Workshop {
   }
   get state(): PlayerState {
     return structuredClone(this.value);
+  }
+  // Session-local commits let delayed UI work detect intervening successful saves.
+  get saveRevision(): number {
+    return this.revision;
   }
   get creatures(): Creature[] {
     const sold = new Set(this.value.sales.map((sale) => sale.creatureId));
@@ -539,6 +544,7 @@ export class Workshop {
     change(next);
     this.saves.write(next);
     this.value = next;
+    this.revision++;
   }
   manufacture(ids: string[], at: string, controlledMutation?: string): Creature {
     date(at, 'creation time');
@@ -620,12 +626,15 @@ export class Workshop {
   }
   retrySave(): void {
     this.saves.write(this.value);
+    this.revision++;
   }
   importSave(raw: string): void {
     this.value = this.saves.import(raw);
+    this.revision++;
   }
   restoreBackup(): void {
     this.value = this.saves.restoreBackup();
+    this.revision++;
   }
   startBattle(
     ids: string[],
