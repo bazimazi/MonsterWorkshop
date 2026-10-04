@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { ContentIndex, decodeCatalog } from '../dist/src/domain/catalog.js';
 import { Workshop } from '../dist/src/application/workshop.js';
 import { initialState, stateCodec } from '../dist/src/application/state.js';
-import { SaveRepository } from '../dist/src/platform/save.js';
+import { SaveRepository, SaveConflictError } from '../dist/src/platform/save.js';
 import { LocalAnalytics } from '../dist/src/platform/services.js';
 const content = new ContentIndex(
   decodeCatalog(JSON.parse(readFileSync('content/catalog.json', 'utf8'))),
@@ -55,6 +55,45 @@ test('failed save leaves inventory, currency, creatures and telemetry unchanged'
   assert.throws(() => f.workshop.manufacture(ids, at));
   assert.deepEqual(f.workshop.state, before);
   assert.equal(f.analytics.events.length, 0);
+});
+
+test('another workshop writer cannot roll back progress through actions, timers, imports or retries', () => {
+  const f = fixture();
+  f.workshop.manufacture(ids, at);
+  f.workshop.startExpedition('green-meadow', 'creature-1', at);
+  const storage = {
+    getItem: (key) => f.values.get(key) ?? null,
+    setItem: (key, value) => f.values.set(key, value),
+    removeItem: (key) => f.values.delete(key),
+  };
+  const analytics = new LocalAnalytics(),
+    stale = new Workshop(content, new SaveRepository(storage, stateCodec(content)), analytics, 9),
+    before = stale.state,
+    earlierSave = stale.exportSave();
+  f.workshop.updateProfile('Latest engineer', 'Saved in the active tab.');
+  f.workshop.advanceExpeditions(1000);
+  const latest = [...f.values];
+  for (const action of [
+    () => stale.manufacture(['dragon-head', 'wolf-body'], at),
+    () => stale.advanceExpeditions(1000),
+    () => stale.retrySave(),
+    () => stale.importSave(earlierSave),
+    () => stale.restoreBackup(),
+  ]) {
+    assert.throws(action, SaveConflictError);
+    assert.deepEqual(stale.state, before);
+    assert.deepEqual([...f.values], latest);
+    assert.equal(analytics.events.length, 0);
+  }
+  const reloaded = new Workshop(
+    content,
+    new SaveRepository(storage, stateCodec(content)),
+    analytics,
+    9,
+  );
+  assert.deepEqual(reloaded.state, f.workshop.state);
+  reloaded.advanceExpeditions(1000);
+  assert.equal(reloaded.state.expeditions[0].elapsedMs, 2000);
 });
 test('locked components, invalid anatomy and exhausted inventory cannot be spent', () => {
   const f = fixture();

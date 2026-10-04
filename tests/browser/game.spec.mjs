@@ -3,8 +3,9 @@ import { fullResearchWorkshop } from '../helpers/research-workshop.mjs';
 test('weekly experiment earns seasonal anatomy, unlocks Frozen Peaks and enables its boss', async ({
   page,
 }) => {
-  await page.clock.install();
-  await page.clock.setSystemTime(new Date('2026-10-03T00:00:00Z'));
+  const time = new Date('2026-10-03T00:00:00Z');
+  await page.clock.install({ time });
+  await page.clock.pauseAt(time);
   const { w } = fullResearchWorkshop();
   await page.goto('/#settings');
   await page.getByLabel('Import save', { exact: true }).setInputFiles({

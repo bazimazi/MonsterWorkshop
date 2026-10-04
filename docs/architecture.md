@@ -22,6 +22,14 @@ docs/          architecture, phase evidence, manual playtest guide
 
 Presentation calls application actions; application orchestrates domain rules and injected storage/analytics. Domain has no DOM, network, localStorage or current-clock reads; time calculations use explicit timestamps. Creature creation receives seed and creation timestamp explicitly. Persisted data is decoded at every write/import boundary. UI changes happen only after the save transaction succeeds.
 
+### Multiple-tab persistence
+
+Before loading a workshop, the browser requests an exclusive writer lock for the shared save key. The lock remains held through normal gameplay and save recovery. Other tabs display a waiting screen, run no gameplay timers and read the latest save only after acquiring ownership. Closing or leaving a document releases ownership and aborts pending requests; returning from a cached page reloads and reacquires ownership. The lock callback's lifetime follows the [Web Locks specification](https://www.w3.org/TR/web-locks/#api-lock-manager).
+
+The save repository also compares the current primary bytes with its last observed record before touching either primary or backup. Missing and damaged records establish baselines too, while a repository that has not loaded expects an empty primary. Changed data raises a dedicated conflict error without mutating memory, storage or telemetry. Gameplay, timers, retries, imports, backup restores and recovery resets all cross this boundary. Startup and recovery conflicts display a reload action rather than offering to replace newer progress.
+
+Storage events pause stale UI sessions, cancel pending reveals and require loading the latest workshop. Timer and asynchronous file handlers stop when their document leaves or becomes stale. Browsers without Web Locks still use conflict detection and storage events, but their read/compare/write sequence is not atomic across tabs: use one active tab there. A browser that exposes locks but rejects coordination shows a retry screen and preserves saved data.
+
 ## Domain model
 
 ```mermaid

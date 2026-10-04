@@ -25,6 +25,8 @@ import { currentEvent } from '../domain/events.js';
 import { captureFocus, containTabFocus, restoreFocus } from './focus.js';
 import type { FocusBookmark } from './focus.js';
 import type { BattleReward } from '../application/workshop.js';
+import { SAVE_KEY, SaveConflictError } from '../platform/save.js';
+import { showSaveChanged } from './recovery.js';
 export function downloadSave(raw: string, filename = 'monster-workshop-save.json'): void {
   const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' })),
     link = document.createElement('a');
@@ -69,6 +71,8 @@ export class GameUI {
   private explorerId: string | undefined;
   private lastTick = performance.now();
   private clockFailed = false;
+  private saveChanged = false;
+  private sessionEnded = false;
   private calendarKey: string | null = null;
   private renderedScreen: Screen | undefined;
   private dialogReturnFocus: FocusBookmark | undefined;
@@ -100,6 +104,10 @@ export class GameUI {
       }
     });
     root.addEventListener('submit', (event) => {
+      if (this.saveChanged || this.sessionEnded) {
+        event.preventDefault();
+        return;
+      }
       const form = event.target as HTMLFormElement;
       if (form.dataset.sharePaste) {
         event.preventDefault();
@@ -142,14 +150,30 @@ export class GameUI {
       this.lastTick = performance.now();
       if (!document.hidden) this.refreshCalendar();
     });
-    setInterval(() => this.tick(), 1000);
+    const interval = setInterval(() => this.tick(), 1000);
+    window.addEventListener(
+      'pagehide',
+      () => {
+        this.sessionEnded = true;
+        clearInterval(interval);
+        if (this.timer) clearTimeout(this.timer);
+      },
+      { once: true },
+    );
+    window.addEventListener('storage', (event) => {
+      if (event.storageArea === localStorage && (event.key === SAVE_KEY || event.key === null)) {
+        this.saveChanged = true;
+        if (this.timer) clearTimeout(this.timer);
+        this.render();
+      }
+    });
     this.render();
   }
   private tick(): void {
     const now = performance.now(),
       elapsed = Math.max(0, Math.min(1000, Math.floor(now - this.lastTick)));
     this.lastTick = now;
-    if (document.hidden) return;
+    if (document.hidden || this.saveChanged || this.sessionEnded) return;
     this.refreshCalendar();
     if (this.clockFailed) return;
     try {
@@ -262,6 +286,10 @@ export class GameUI {
   }
   private fail(error: unknown): void {
     logger.error(error);
+    if (error instanceof SaveConflictError) {
+      this.saveChanged = true;
+      if (this.timer) clearTimeout(this.timer);
+    }
     this.notify(error instanceof Error ? error.message : 'Something went wrong', true);
     this.render();
   }
@@ -272,6 +300,11 @@ export class GameUI {
     this.feedback.haptics = state.options.haptics;
   }
   private render(focusPart?: string): void {
+    if (this.sessionEnded) return;
+    if (this.saveChanged) {
+      showSaveChanged(this.root);
+      return;
+    }
     const focus = captureFocus(this.root),
       previousDialog = this.root.querySelector('dialog'),
       sameScreen = this.renderedScreen === this.nav.current,
@@ -618,6 +651,11 @@ export class GameUI {
     }, 450);
   }
   private async act(action: string, button: HTMLElement): Promise<void> {
+    if (action === 'reload-save') {
+      location.reload();
+      return;
+    }
+    if (this.saveChanged || this.sessionEnded) return;
     if (action === 'skip-content') {
       const heading = this.root.querySelector<HTMLElement>('main h1');
       heading?.focus();
@@ -907,6 +945,7 @@ export class GameUI {
     }
   }
   private async change(input: HTMLInputElement): Promise<void> {
+    if (this.saveChanged || this.sessionEnded) return;
     if (input.dataset.socialCreature) {
       this.socialCreature = input.value;
       this.render();
@@ -914,7 +953,9 @@ export class GameUI {
     if (input.dataset.shareImport) {
       const file = input.files?.[0];
       if (file) {
-        this.workshop.importShare(await file.text());
+        const raw = await file.text();
+        if (this.saveChanged || this.sessionEnded) return;
+        this.workshop.importShare(raw);
         this.notify('Shared design imported.');
         this.render();
       }
@@ -967,7 +1008,9 @@ export class GameUI {
       const file = input.files?.[0];
       if (!file) return;
       if (file.size > 1_000_000) throw new Error('Save file is too large');
-      this.workshop.importSave(await file.text());
+      const raw = await file.text();
+      if (this.saveChanged || this.sessionEnded) return;
+      this.workshop.importSave(raw);
       this.resetSession();
       this.notify('Workshop imported.');
       this.render();

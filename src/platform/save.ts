@@ -7,12 +7,19 @@ export interface Codec<T> {
   decode(value: unknown): T;
 }
 export class SaveError extends Error {}
+export class SaveConflictError extends SaveError {
+  constructor() {
+    super('Your saved workshop changed. Reload the latest workshop before continuing.');
+  }
+}
+export const SAVE_KEY = 'monster-workshop.save';
 export class SaveRepository<T> {
   private validatedRaw: string | undefined;
+  private observedRaw: string | null = null;
   constructor(
     private storage: StoragePort,
     private codec: Codec<T>,
-    private key = 'monster-workshop.save',
+    private key = SAVE_KEY,
   ) {}
   private read(key: string): string | null {
     try {
@@ -35,6 +42,8 @@ export class SaveRepository<T> {
   }
   load(): T | null {
     const raw = this.read(this.key);
+    // Even missing or damaged records establish a baseline for creation/recovery.
+    this.observedRaw = raw;
     if (raw === null) return null;
     const data = this.decode(raw);
     this.validatedRaw = raw;
@@ -43,8 +52,9 @@ export class SaveRepository<T> {
   write(data: T): void {
     // Decode before writing: every mutation crosses the same validation boundary as imports.
     const validated = this.codec.decode(data);
+    const old = this.read(this.key);
+    if (old !== this.observedRaw) throw new SaveConflictError();
     try {
-      const old = this.read(this.key);
       let validPrevious = old !== null && old === this.validatedRaw;
       if (old !== null && !validPrevious) {
         try {
@@ -62,6 +72,7 @@ export class SaveRepository<T> {
       });
       this.storage.setItem(this.key, raw);
       this.validatedRaw = raw;
+      this.observedRaw = raw;
     } catch {
       throw new SaveError('Your browser could not save. Free some storage and try again.');
     }
