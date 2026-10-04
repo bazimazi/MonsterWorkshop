@@ -1,3 +1,5 @@
+import { exceedsUtf8Limit } from '../domain/validation.js';
+
 export interface StoragePort {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -13,6 +15,8 @@ export class SaveConflictError extends SaveError {
   }
 }
 export const SAVE_KEY = 'monster-workshop.save';
+export const MAX_SAVE_BYTES = 64 * 1024 * 1024;
+export const SAVE_SIZE_ERROR = 'Save file is too large (maximum 64 MiB).';
 export class SaveRepository<T> {
   private validatedRaw: string | undefined;
   private observedRaw: string | null = null;
@@ -32,6 +36,7 @@ export class SaveRepository<T> {
   }
   private decode(raw: string): T {
     try {
+      if (exceedsUtf8Limit(raw, MAX_SAVE_BYTES)) throw new SaveError(SAVE_SIZE_ERROR);
       const envelope: unknown = JSON.parse(raw);
       if (!isRecord(envelope) || envelope.schemaVersion !== 1)
         throw new SaveError('Unsupported save version. Export your save before resetting.');
@@ -52,6 +57,12 @@ export class SaveRepository<T> {
   write(data: T): void {
     // Decode before writing: every mutation crosses the same validation boundary as imports.
     const validated = this.codec.decode(data);
+    const raw = JSON.stringify({
+      schemaVersion: 1,
+      savedAt: new Date().toISOString(),
+      data: validated,
+    });
+    if (exceedsUtf8Limit(raw, MAX_SAVE_BYTES)) throw new SaveError(SAVE_SIZE_ERROR);
     const old = this.read(this.key);
     if (old !== this.observedRaw) throw new SaveConflictError();
     try {
@@ -65,11 +76,6 @@ export class SaveRepository<T> {
         }
       }
       if (validPrevious) this.storage.setItem(this.key + '.backup', old!);
-      const raw = JSON.stringify({
-        schemaVersion: 1,
-        savedAt: new Date().toISOString(),
-        data: validated,
-      });
       this.storage.setItem(this.key, raw);
       this.validatedRaw = raw;
       this.observedRaw = raw;

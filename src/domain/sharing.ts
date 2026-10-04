@@ -3,7 +3,17 @@ import type { CreatureSource } from './model.js';
 import { validateAnatomy } from './generator.js';
 import { decodeCreature } from './serialization.js';
 import { hash } from './random.js';
-import { DomainError, list, number, record, string, strings, unique } from './validation.js';
+import {
+  DomainError,
+  exceedsUtf8Limit,
+  list,
+  number,
+  record,
+  string,
+  strings,
+  unique,
+} from './validation.js';
+export const MAX_SHARE_BYTES = 200000;
 export interface Profile {
   name: string;
   bio: string;
@@ -64,14 +74,16 @@ export function decodeGallery(raw: unknown, c: ContentIndex): GalleryEntry {
   return { id, source, profile: decodeProfile(g.profile) };
 }
 export function encodeShare(share: Share, c: ContentIndex): string {
-  return JSON.stringify(
+  const raw = JSON.stringify(
     { format: 'monster-workshop.share', version: 1, contentVersion: c.catalog.version, ...share },
     null,
     2,
   );
+  if (exceedsUtf8Limit(raw, MAX_SHARE_BYTES)) throw new DomainError('Shared file is too large');
+  return raw;
 }
 export function decodeShare(raw: string, c: ContentIndex): Share {
-  if (raw.length > 200000) throw new DomainError('Shared file is too large');
+  if (exceedsUtf8Limit(raw, MAX_SHARE_BYTES)) throw new DomainError('Shared file is too large');
   const s = record(JSON.parse(raw), 'shared design');
   if (s.format !== 'monster-workshop.share')
     throw new DomainError('This is not a Monster Workshop shared design');

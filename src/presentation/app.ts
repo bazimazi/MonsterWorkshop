@@ -25,7 +25,14 @@ import { currentEvent } from '../domain/events.js';
 import { captureFocus, containTabFocus, restoreFocus } from './focus.js';
 import type { FocusBookmark } from './focus.js';
 import type { BattleReward } from '../application/workshop.js';
-import { SAVE_KEY, SaveConflictError } from '../platform/save.js';
+import {
+  MAX_SAVE_BYTES,
+  SAVE_KEY,
+  SAVE_SIZE_ERROR,
+  SaveConflictError,
+  SaveError,
+} from '../platform/save.js';
+import { MAX_SHARE_BYTES } from '../domain/sharing.js';
 import { showSaveChanged } from './recovery.js';
 export function downloadSave(raw: string, filename = 'monster-workshop-save.json'): void {
   const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' })),
@@ -953,6 +960,7 @@ export class GameUI {
     if (input.dataset.shareImport) {
       const file = input.files?.[0];
       if (file) {
+        if (file.size > MAX_SHARE_BYTES) throw new Error('Shared file is too large');
         const raw = await file.text();
         if (this.saveChanged || this.sessionEnded) return;
         this.workshop.importShare(raw);
@@ -1007,7 +1015,7 @@ export class GameUI {
     if (input.dataset.import) {
       const file = input.files?.[0];
       if (!file) return;
-      if (file.size > 1_000_000) throw new Error('Save file is too large');
+      if (file.size > MAX_SAVE_BYTES) throw new SaveError(SAVE_SIZE_ERROR);
       const raw = await file.text();
       if (this.saveChanged || this.sessionEnded) return;
       this.workshop.importSave(raw);

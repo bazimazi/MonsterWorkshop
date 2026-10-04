@@ -59,6 +59,28 @@ test('creature source serialization preserves provenance and drops derived impor
   assert.deepEqual(deserializeCreature(serializeCreature(c, content), content), c);
   assert.equal(decodeCreature({ ...c, stats: { attack: 99999 } }, content).stats, undefined);
 });
+
+test('nested creature fields discard unknown data and retain only validated genetics, history and lineage', () => {
+  const expected = source();
+  expected.lineage = {
+    parentIds: ['parent-a', 'parent-b'],
+    parentNames: ['Aster', 'Pip'],
+    generation: 2,
+    inheritance: Object.fromEntries(GENES.map((id) => [id, 'blend'])),
+  };
+  const decorated = structuredClone(expected);
+  for (const gene of Object.values(decorated.genome))
+    gene.derivedStats = { attack: 99999, padding: 'x'.repeat(1000) };
+  decorated.history.inventory = { biomass: 99999 };
+  decorated.lineage.snapshots = [{ arbitrary: 'x'.repeat(1000) }];
+  assert.deepEqual(decodeGenome(decorated.genome), expected.genome);
+  assert.deepEqual(decodeCreature(decorated, content), expected);
+  const decoded = decodeCreature(decorated, content);
+  decorated.genome.strength.value = 0;
+  decorated.history.battles = 10;
+  decorated.lineage.parentNames[0] = 'Changed';
+  assert.deepEqual(decoded, expected);
+});
 test('genome validates every gene, bounds and dominance', () => {
   const genome = source().genome;
   assert.deepEqual(decodeGenome(genome), genome);

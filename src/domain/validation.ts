@@ -1,4 +1,10 @@
 export class DomainError extends Error {}
+export function exceedsUtf8Limit(value: string, maximumBytes: number): boolean {
+  // UTF-8 uses at least one and at most three bytes per UTF-16 code unit.
+  if (value.length > maximumBytes) return true;
+  if (value.length * 3 <= maximumBytes) return false;
+  return new TextEncoder().encode(value).byteLength > maximumBytes;
+}
 export function record(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value))
     throw new DomainError(`${label} must be an object`);

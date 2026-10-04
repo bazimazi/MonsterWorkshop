@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fullResearchWorkshop } from './helpers/research-workshop.mjs';
-import { decodeShare } from '../dist/src/domain/sharing.js';
+import { decodeShare, encodeShare, MAX_SHARE_BYTES } from '../dist/src/domain/sharing.js';
 import { initialState, stateCodec } from '../dist/src/application/state.js';
 import { Workshop } from '../dist/src/application/workshop.js';
 import { SaveRepository } from '../dist/src/platform/save.js';
@@ -92,4 +92,27 @@ test('failed sharing/profile saves roll back libraries and profile changes', () 
   assert.throws(() => f.w.saveBlueprint(f.w.creatures[0].id));
   assert.throws(() => f.w.updateProfile('Another', 'Changed biography.'));
   assert.deepEqual(f.w.state, before);
+});
+
+test('shared file limits measure UTF-8 bytes and discard padding at the accepted boundary', () => {
+  const { w, repo } = fullResearchWorkshop(),
+    envelope = JSON.parse(w.exportCreature(w.creatures[0].id));
+  envelope.padding = '';
+  const remaining = MAX_SHARE_BYTES - Buffer.byteLength(JSON.stringify(envelope));
+  envelope.padding = '漢'.repeat(Math.floor(remaining / 3)) + 'x'.repeat(remaining % 3);
+  const exact = JSON.stringify(envelope),
+    expected = decodeShare(exact, w.content);
+  assert.equal(Buffer.byteLength(exact), MAX_SHARE_BYTES);
+  assert(exact.length < MAX_SHARE_BYTES);
+  w.importShare(exact);
+  assert.deepEqual(w.state.gallery[0].source, expected.creatures[0]);
+  assert(repo.export().length < MAX_SHARE_BYTES);
+  const before = w.state,
+    stored = repo.export();
+  envelope.padding += 'x';
+  assert.throws(() => w.importShare(JSON.stringify(envelope)), /Shared file is too large/);
+  assert.deepEqual(w.state, before);
+  assert.equal(repo.export(), stored);
+  expected.creatures[0].history.padding = envelope.padding;
+  assert.throws(() => encodeShare(expected, w.content), /Shared file is too large/);
 });

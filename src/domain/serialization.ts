@@ -14,14 +14,21 @@ import {
 } from './validation.js';
 export function decodeGenome(value: unknown): Genome {
   const genome = record(value, 'genome');
+  const decoded = {} as Genome;
   for (const id of GENES) {
     const gene = record(genome[id], id);
-    number(gene.value, id, 0, 100, true);
-    member(gene.dominance, ['dominant', 'recessive', 'hybrid', 'unstable'], 'dominance');
+    decoded[id] = {
+      value: number(gene.value, id, 0, 100, true),
+      dominance: member(
+        gene.dominance,
+        ['dominant', 'recessive', 'hybrid', 'unstable'],
+        'dominance',
+      ),
+    };
   }
   if (Object.keys(genome).length !== GENES.length)
     throw new DomainError('Genome has unknown genes');
-  return structuredClone(genome) as Genome;
+  return decoded;
 }
 export function decodeCreature(value: unknown, content: ContentIndex): CreatureSource {
   const c = record(value, 'creature');
@@ -44,7 +51,7 @@ export function decodeCreature(value: unknown, content: ContentIndex): CreatureS
   );
   for (const slot of content.catalog.rules.generation.requiredSlots)
     if (!parts.some((p) => p.slot === slot)) throw new DomainError(`Missing ${slot}`);
-  decodeGenome(c.genome);
+  const genome = decodeGenome(c.genome);
   const mutations = strings(c.mutationIds, 'mutations');
   unique(mutations, 'mutations');
   for (const id of mutations)
@@ -62,19 +69,28 @@ export function decodeCreature(value: unknown, content: ContentIndex): CreatureS
   if ((history.victories as number) > (history.battles as number))
     throw new DomainError('Victories exceed battles');
   if (history.firstBattleAt !== null) date(history.firstBattleAt, 'first battle');
+  let decodedLineage: CreatureSource['lineage'];
   if (c.lineage !== undefined) {
     const lineage = record(c.lineage, 'lineage');
     const parents = strings(lineage.parentIds, 'parents', 2);
     if (parents.length !== 2 || parents.includes(c.id as string))
       throw new DomainError('Invalid parents');
     unique(parents, 'parents');
-    if (strings(lineage.parentNames, 'parent names', 2).length !== 2)
-      throw new DomainError('Two parent names required');
+    const parentNames = strings(lineage.parentNames, 'parent names', 2);
+    if (parentNames.length !== 2) throw new DomainError('Two parent names required');
     number(lineage.generation, 'lineage generation', 2, 1000000, true);
     const inheritance = record(lineage.inheritance, 'inheritance');
     if (Object.keys(inheritance).length !== GENES.length)
       throw new DomainError('Incomplete inheritance');
     for (const gene of GENES) member(inheritance[gene], ['a', 'b', 'blend'], 'inherited gene');
+    decodedLineage = {
+      parentIds: parents as [string, string],
+      parentNames: parentNames as [string, string],
+      generation: lineage.generation as number,
+      inheritance: Object.fromEntries(
+        GENES.map((gene) => [gene, inheritance[gene]]),
+      ) as NonNullable<CreatureSource['lineage']>['inheritance'],
+    };
   }
   // Pick source fields explicitly; derived stats injected into an import are discarded.
   return structuredClone({
@@ -83,7 +99,7 @@ export function decodeCreature(value: unknown, content: ContentIndex): CreatureS
     generationVersion: c.generationVersion,
     seed: c.seed,
     componentIds: ids,
-    genome: c.genome,
+    genome,
     mutationIds: mutations,
     name: c.name,
     experience: c.experience,
@@ -92,10 +108,13 @@ export function decodeCreature(value: unknown, content: ContentIndex): CreatureS
     equipment: [],
     createdAt: c.createdAt,
     creator: c.creator,
-    history: c.history,
-    ...(c.lineage === undefined
-      ? {}
-      : { lineage: c.lineage as NonNullable<CreatureSource['lineage']> }),
+    history: {
+      battles: history.battles,
+      victories: history.victories,
+      discoveries: history.discoveries,
+      firstBattleAt: history.firstBattleAt,
+    },
+    ...(decodedLineage === undefined ? {} : { lineage: decodedLineage }),
   }) as CreatureSource;
 }
 export function serializeCreature(creature: CreatureSource, content: ContentIndex): string {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SaveRepository, SaveError } from '../dist/src/platform/save.js';
+import { MAX_SAVE_BYTES, SaveRepository, SaveError } from '../dist/src/platform/save.js';
 import { LocalAnalytics } from '../dist/src/platform/services.js';
 const codec = {
   decode(value) {
@@ -166,4 +166,39 @@ test('a recovery screen cannot replace valid progress written after it loaded da
     assert.deepEqual([...s.values], latest);
   }
   assert.deepEqual(recovery.load(), { count: 3 });
+});
+
+test('save byte limits accept the exact UTF-8 boundary and reject oversized writes before touching backups', () => {
+  const s = storage(),
+    repo = new SaveRepository(s, codec);
+  repo.write({ count: 0 });
+  const envelope = {
+    schemaVersion: 1,
+    savedAt: new Date().toISOString(),
+    data: { count: 1, padding: '' },
+  };
+  const remaining = MAX_SAVE_BYTES - Buffer.byteLength(JSON.stringify(envelope));
+  envelope.data.padding = '漢'.repeat(Math.floor(remaining / 3)) + 'x'.repeat(remaining % 3);
+  const raw = JSON.stringify(envelope);
+  assert.equal(Buffer.byteLength(raw), MAX_SAVE_BYTES);
+  assert(raw.length < MAX_SAVE_BYTES);
+  repo.import(raw);
+  assert.equal(Buffer.byteLength(repo.export()), MAX_SAVE_BYTES);
+  const previous = [...s.values];
+  const oversized = JSON.stringify({
+    ...envelope,
+    data: { ...envelope.data, padding: envelope.data.padding + 'x' },
+  });
+  for (const action of [
+    () => repo.import(oversized),
+    () => repo.write({ ...envelope.data, padding: envelope.data.padding + 'x' }),
+  ]) {
+    assert.throws(action, /Save file is too large/);
+    assert.deepEqual([...s.values], previous);
+  }
+  s.setItem('monster-workshop.save', oversized);
+  assert.throws(() => repo.load(), /Save file is too large/);
+  assert.equal(repo.export(), oversized);
+  assert.deepEqual(repo.restoreBackup(), { count: 0 });
+  assert.equal(s.getItem('monster-workshop.save.backup'), previous[1][1]);
 });
